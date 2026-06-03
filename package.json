@@ -1,0 +1,84 @@
+{
+    "name": "@johannes.latzel/llm-chat-web",
+    "version": "0.1.0",
+    "description": "Web tool suite for the llm-chat ecosystem",
+    "license": "MIT",
+    "files": [
+        "dist/",
+        "README.md",
+        "LICENSE"
+    ],
+    "author": "Johannes B. Latzel",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/johanneslatzel/llm-chat-web.git"
+    },
+    "bugs": {
+        "url": "https://github.com/johanneslatzel/llm-chat-web/issues"
+    },
+    "homepage": "https://github.com/johanneslatzel/llm-chat-web#readme",
+    "keywords": [
+        "llm",
+        "chat",
+        "web",
+        "search",
+        "fetch",
+        "tool"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "docs": "docker run --rm -it -p 8000:8000 -v $PWD:/docs squidfunk/mkdocs-material",
+        "lint": "eslint . --max-warnings 0",
+        "format": "prettier --write src",
+        "verify": "tsc --noEmit && eslint . --max-warnings 0 && vitest run --coverage",
+        "test": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "prepare": "husky"
+    },
+    "lint-staged": {
+        "src/**/*.ts": [
+            "prettier --write",
+            "eslint --max-warnings 0 --no-warn-ignored",
+            "vitest related --run"
+        ]
+    },
+    "dependencies": {
+        "@johannes.latzel/llm-chat": "^0.3.0",
+        "@mozilla/readability": "^0.6.0",
+        "jsdom": "^29.1.1",
+        "p-map": "^7.0.4"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.24.0",
+        "@types/jsdom": "^28.0.3",
+        "@types/node": "^22.19.19",
+        "@types/uuid": "^10.0.0",
+        "@typescript-eslint/eslint-plugin": "^8.60.1",
+        "@typescript-eslint/parser": "^8.60.1",
+        "@vitest/coverage-v8": "^4.1.8",
+        "concurrently": "^9.2.1",
+        "eslint": "^9.39.4",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-n": "^17.24.0",
+        "husky": "^9.1.7",
+        "lint-staged": "^15.5.2",
+        "prettier": "^3.8.3",
+        "typescript": "^6.0.3",
+        "vitest": "^4.1.8"
+    }
+}

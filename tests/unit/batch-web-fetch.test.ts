@@ -297,6 +297,53 @@ describe('BatchWebFetchTool', () => {
         expect(result.result).toContain('Content too large');
     });
 
+    it('returns marker-only when budget exhausted by truncation overhead', async () => {
+        mockFetch(htmlResponse('some text content here to truncate'));
+        const tool = new BatchWebFetchTool(cfg);
+        const result = await tool.execute({ urls: '["https://example.com"]', raw: true, max_chars: 5 });
+        expect(result.status).toBe(ResultStatus.Success);
+        expect(result.result).toContain('[truncated]');
+    });
+
+    it('rejects valid JSON that is not an array in urls', async () => {
+        const tool = new BatchWebFetchTool(cfg);
+        const result = await tool.execute({ urls: '"not-an-array"' });
+        expect(result.status).toBe(ResultStatus.Error);
+        expect(result.result).toContain('urls');
+    });
+
+    it('rejects JSON object in urls', async () => {
+        const tool = new BatchWebFetchTool(cfg);
+        const result = await tool.execute({ urls: '{"key": "value"}' });
+        expect(result.status).toBe(ResultStatus.Error);
+        expect(result.result).toContain('urls');
+    });
+
+    it('handles non-Error thrown values in fetch', async () => {
+        vi.spyOn(globalThis, 'fetch').mockRejectedValue('string error');
+        const tool = new BatchWebFetchTool(cfg);
+        const result = await tool.execute({ urls: '["https://example.com"]' });
+        expect(result.status).toBe(ResultStatus.Error);
+        expect(result.result).toContain('Unknown fetch error');
+    });
+
+    it('falls back to text/plain when content-type header is missing', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            text: () =>
+                Promise.resolve(
+                    'plain text content that is long enough for extraction and testing purposes in this test scenario for the fallback path.'
+                ),
+            headers: { get: () => null, forEach: () => {} },
+            url: 'http://example.com'
+        } as unknown as Response);
+        const tool = new BatchWebFetchTool(cfg);
+        const result = await tool.execute({ urls: '["https://example.com"]' });
+        expect(result.status).toBe(ResultStatus.Success);
+    });
+
     it('handles pMap throwing unexpectedly', async () => {
         mockPMap.mockRejectedValue(new Error('pMap failed'));
         const tool = new BatchWebFetchTool(cfg);

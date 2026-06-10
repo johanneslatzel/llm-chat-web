@@ -1,4 +1,5 @@
 import { WebSearchProvider } from './types.js';
+import { envInt, envString, envEnum } from './env.js';
 
 const MAX_CHARS_PER_FETCH_DEFAULT = 10_000;
 const MAX_CHARS_PER_FETCH_LIMIT = 100_000;
@@ -26,13 +27,15 @@ const BATCH_FETCH_MAX_CONCURRENCY_DEFAULT = 10;
  * @property searchTimeoutMs  Timeout per search-API call in ms (env: `LLM_CHAT_WEB_SEARCH_TIMEOUT_MS`).
  */
 export class WebSearchConfiguration {
-    apiKey: string;
-    provider: WebSearchProvider;
-    maxResults: number = parseInt(process.env.LLM_CHAT_WEB_SEARCH_MAX_RESULTS ?? '', 10) || 5;
-    maxCharsPerResult: number =
-        parseInt(process.env.LLM_CHAT_WEB_SEARCH_MAX_CHARS_PER_RESULT ?? '', 10) || 2000;
-    searchTimeoutMs: number =
-        parseInt(process.env.LLM_CHAT_WEB_SEARCH_TIMEOUT_MS ?? '', 10) || SEARCH_TIMEOUT_DEFAULT_MS;
+    apiKey: string = envString('LLM_CHAT_WEB_SEARCH_API_KEY', '');
+    provider: WebSearchProvider = envEnum(
+        'LLM_CHAT_WEB_SEARCH_PROVIDER',
+        Object.values(WebSearchProvider) as WebSearchProvider[],
+        WebSearchProvider.DuckDuckGo
+    );
+    maxResults: number = envInt('LLM_CHAT_WEB_SEARCH_MAX_RESULTS', 5);
+    maxCharsPerResult: number = envInt('LLM_CHAT_WEB_SEARCH_MAX_CHARS_PER_RESULT', 2000);
+    searchTimeoutMs: number = envInt('LLM_CHAT_WEB_SEARCH_TIMEOUT_MS', SEARCH_TIMEOUT_DEFAULT_MS);
 
     /**
      * @param provider Search provider to use. If omitted, resolved from
@@ -41,23 +44,8 @@ export class WebSearchConfiguration {
      *                 `LLM_CHAT_WEB_SEARCH_API_KEY` env var.
      */
     constructor(provider?: WebSearchProvider, apiKey?: string) {
-        if (apiKey !== undefined) {
-            this.apiKey = apiKey;
-        } else {
-            this.apiKey = process.env.LLM_CHAT_WEB_SEARCH_API_KEY ?? '';
-        }
-        if (provider !== undefined) {
-            this.provider = provider;
-        } else {
-            const envProvider = (process.env.LLM_CHAT_WEB_SEARCH_PROVIDER || '').toLowerCase();
-            if (envProvider === 'tavily') {
-                this.provider = WebSearchProvider.Tavily;
-            } else if (envProvider === 'exaai') {
-                this.provider = WebSearchProvider.ExaAI;
-            } else {
-                this.provider = WebSearchProvider.DuckDuckGo;
-            }
-        }
+        if (apiKey !== undefined) this.apiKey = apiKey;
+        if (provider !== undefined) this.provider = provider;
     }
 }
 
@@ -69,17 +57,19 @@ export class WebSearchConfiguration {
  * @property maxContentLengthBytes Maximum allowed response body length before rejection (env: `LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES`).
  */
 export class WebFetchConfiguration {
-    maxCharsPerFetch: number =
-        parseInt(process.env.LLM_CHAT_WEB_MAX_CHARS_PER_FETCH ?? '', 10) ||
-        MAX_CHARS_PER_FETCH_DEFAULT;
-    maxCharsPerFetchLimit: number =
-        parseInt(process.env.LLM_CHAT_WEB_MAX_CHARS_PER_FETCH_LIMIT ?? '', 10) ||
-        MAX_CHARS_PER_FETCH_LIMIT;
-    fetchTimeoutMs: number =
-        parseInt(process.env.LLM_CHAT_WEB_FETCH_TIMEOUT_MS ?? '', 10) || FETCH_TIMEOUT_DEFAULT_MS;
-    maxContentLengthBytes: number =
-        parseInt(process.env.LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES ?? '', 10) ||
-        MAX_CONTENT_LENGTH_BYTES_DEFAULT;
+    maxCharsPerFetch: number = envInt(
+        'LLM_CHAT_WEB_MAX_CHARS_PER_FETCH',
+        MAX_CHARS_PER_FETCH_DEFAULT
+    );
+    maxCharsPerFetchLimit: number = envInt(
+        'LLM_CHAT_WEB_MAX_CHARS_PER_FETCH_LIMIT',
+        MAX_CHARS_PER_FETCH_LIMIT
+    );
+    fetchTimeoutMs: number = envInt('LLM_CHAT_WEB_FETCH_TIMEOUT_MS', FETCH_TIMEOUT_DEFAULT_MS);
+    maxContentLengthBytes: number = envInt(
+        'LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES',
+        MAX_CONTENT_LENGTH_BYTES_DEFAULT
+    );
 }
 
 /** Configuration for the batch-URL fetch tool.
@@ -90,12 +80,14 @@ export class WebFetchConfiguration {
  */
 export class BatchWebFetchConfiguration {
     fetchConfig: WebFetchConfiguration;
-    concurrency: number =
-        parseInt(process.env.LLM_CHAT_WEB_BATCH_FETCH_CONCURRENCY ?? '', 10) ||
-        BATCH_FETCH_CONCURRENCY_DEFAULT;
-    maxConcurrency: number =
-        parseInt(process.env.LLM_CHAT_WEB_BATCH_FETCH_MAX_CONCURRENCY ?? '', 10) ||
-        BATCH_FETCH_MAX_CONCURRENCY_DEFAULT;
+    concurrency: number = envInt(
+        'LLM_CHAT_WEB_BATCH_FETCH_CONCURRENCY',
+        BATCH_FETCH_CONCURRENCY_DEFAULT
+    );
+    maxConcurrency: number = envInt(
+        'LLM_CHAT_WEB_BATCH_FETCH_MAX_CONCURRENCY',
+        BATCH_FETCH_MAX_CONCURRENCY_DEFAULT
+    );
 
     /**
      * @param fetchConfig Single-fetch configuration. Defaults to a fresh `WebFetchConfiguration`.

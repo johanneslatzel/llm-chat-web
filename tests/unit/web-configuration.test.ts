@@ -73,6 +73,24 @@ describe('WebSearchConfiguration', () => {
         const cfg = new WebSearchConfiguration();
         expect(cfg.searchTimeoutMs).toBe(5000);
     });
+
+    it('falls back to default when envInt env var is empty string', () => {
+        process.env.LLM_CHAT_WEB_SEARCH_MAX_RESULTS = '';
+        const cfg = new WebSearchConfiguration();
+        expect(cfg.maxResults).toBe(5);
+    });
+
+    it('falls back to default when envInt env var is non-numeric', () => {
+        process.env.LLM_CHAT_WEB_SEARCH_MAX_RESULTS = 'abc';
+        const cfg = new WebSearchConfiguration();
+        expect(cfg.maxResults).toBe(5);
+    });
+
+    it('falls back to default when envInt env var is negative', () => {
+        process.env.LLM_CHAT_WEB_SEARCH_MAX_RESULTS = '-5';
+        const cfg = new WebSearchConfiguration();
+        expect(cfg.maxResults).toBe(1);
+    });
 });
 
 describe('WebFetchConfiguration', () => {

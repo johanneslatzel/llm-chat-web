@@ -3,13 +3,22 @@ import { fetchWithTimeout, getContentLength } from '../lib/http.js';
 import { extractText } from '../lib/extract.js';
 import {
     PropertyType,
+    ResultBuilder,
     ResultStatus,
     Tool,
     ToolParameterProperty,
     ToolParameters
 } from '@johannes.latzel/llm-chat';
 import type { PartialToolResult } from '@johannes.latzel/llm-chat';
+import pMap from 'p-map';
 
+/**
+ * Truncate extracted (non-raw) text at a natural boundary (paragraph, sentence, or word).
+ *
+ * @param text     The text to truncate.
+ * @param maxChars Maximum allowed characters.
+ * @returns Truncated text with a "[truncated]" marker appended.
+ */
 function truncate(text: string, maxChars: number): string {
     if (text.length <= maxChars) return text;
 
@@ -37,7 +46,7 @@ function truncate(text: string, maxChars: number): string {
     return before + marker;
 }
 
-/** Tool that fetches a single URL and returns its content as extracted plain text. */
+/** Tool that fetches one or more URLs and returns their content as extracted plain text (or raw). */
 export class WebFetchTool extends Tool {
     private readonly config: WebFetchConfiguration;
 
@@ -47,37 +56,37 @@ export class WebFetchTool extends Tool {
     constructor(config: WebFetchConfiguration) {
         super(
             'web_fetch',
-            'Fetches a URL and returns its content as clean text. Use this when you need to read the full content of a web page, article, or documentation.',
+            'Fetches one or more URLs in parallel and returns their content as clean text. Pass an array of URLs ("urls"). Use this when you need to read the full content of web pages, articles, or documentation.',
             new ToolParameters(
                 {
-                    url: new ToolParameterProperty('The URL to fetch (required)'),
+                    urls: new ToolParameterProperty('Array of URLs to fetch', PropertyType.Array),
                     max_chars: new ToolParameterProperty(
-                        'Maximum characters to return (default: 10000, max: 100000)',
+                        'Maximum characters to return per URL (default: 10000, max: 100000)',
                         PropertyType.Number
                     ),
                     raw: new ToolParameterProperty(
-                        'If true, return raw reponse instead of extracted text (e.g. json, xml or source code response expected)',
+                        'If true, return raw response instead of extracted text for each URL (e.g. json, xml or source code response expected)',
                         PropertyType.Boolean
                     )
                 },
-                ['url']
+                ['urls']
             )
         );
         this.config = config;
     }
 
     /**
-     * Execute the fetch.
+     * Execute the fetch for one or more URLs.
      *
-     * @param args.url       The URL to fetch (required).
-     * @param args.max_chars Max characters to return (default: 10000, max: 100000).
-     * @param args.raw       If true, return raw response instead of extracted text.
+     * @param args.urls       The array of URLs to fetch (required).
+     * @param args.max_chars  Max characters to return per URL (default: config default, max: config limit).
+     * @param args.raw        If true, return raw response instead of extracted text.
      */
     protected async onExecute(args: Record<string, unknown>): Promise<PartialToolResult> {
-        const url = args.url;
-        if (typeof url !== 'string' || !url.trim()) {
+        const rawUrls = args.urls;
+        if (!Array.isArray(rawUrls) || rawUrls.length === 0) {
             return {
-                result: "Required parameter 'url' is missing or not a string",
+                result: "'urls' must be a non-empty array of strings",
                 status: ResultStatus.Error
             };
         }
@@ -91,16 +100,54 @@ export class WebFetchTool extends Tool {
                   )
                 : this.config.maxCharsPerFetch;
 
-        try {
-            const trimmedUrl = url.trim();
+        const concurrency = Math.max(1, this.config.concurrency);
 
+        const promises = rawUrls.map((u) => () => this.fetchSingleUrl(u, maxChars, raw));
+
+        try {
+            const results = await pMap(promises, (fn) => fn(), {
+                concurrency,
+                stopOnError: false
+            });
+            return ResultBuilder.from(results).build();
+        } catch (e) {
+            return {
+                result: `Web fetch error: ${(e as Error).message}`,
+                status: ResultStatus.Error
+            };
+        }
+    }
+
+    /**
+     * Fetch a single URL and return a PartialToolResult.
+     *
+     * @param url      The URL to fetch.
+     * @param maxChars Max characters to return.
+     * @param raw      If true, return raw response instead of extracted text.
+     * @returns A PartialToolResult with the fetched content or an error.
+     */
+    private async fetchSingleUrl(
+        url: unknown,
+        maxChars: number,
+        raw: boolean
+    ): Promise<PartialToolResult> {
+        if (typeof url !== 'string' || !url.trim()) {
+            return {
+                result: 'URL must be a non-empty string',
+                status: ResultStatus.Error
+            };
+        }
+
+        const trimmedUrl = url.trim();
+
+        try {
             const contentLength = await getContentLength(trimmedUrl, {
                 timeout: this.config.fetchTimeoutMs
             });
 
             if (contentLength !== undefined && contentLength > this.config.maxContentLengthBytes) {
                 return {
-                    result: `Content too large: ${contentLength} bytes exceeds limit of ${this.config.maxContentLengthBytes} bytes`,
+                    result: `${trimmedUrl}: Content too large: ${contentLength} bytes exceeds limit of ${this.config.maxContentLengthBytes} bytes`,
                     status: ResultStatus.Error
                 };
             }
@@ -111,7 +158,7 @@ export class WebFetchTool extends Tool {
 
             if (!response.ok) {
                 return {
-                    result: `HTTP error ${response.status}: ${response.statusText}`,
+                    result: `${trimmedUrl}: HTTP error ${response.status}: ${response.statusText}`,
                     status: ResultStatus.Error
                 };
             }
@@ -121,7 +168,7 @@ export class WebFetchTool extends Tool {
 
                 if (!contentType.startsWith('text/html') && !contentType.startsWith('text/plain')) {
                     return {
-                        result: `Unsupported content type: ${contentType}. Only HTML and plain text are supported.`,
+                        result: `${trimmedUrl}: Unsupported content type: ${contentType}. Only HTML and plain text are supported.`,
                         status: ResultStatus.Error
                     };
                 }
@@ -148,7 +195,7 @@ export class WebFetchTool extends Tool {
         } catch (e) {
             const message = e instanceof Error ? e.message : 'Unknown fetch error';
             return {
-                result: `Web fetch error: ${message}`,
+                result: `${trimmedUrl}: Web fetch error: ${message}`,
                 status: ResultStatus.Error
             };
         }

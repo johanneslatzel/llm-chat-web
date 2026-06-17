@@ -34,20 +34,3 @@ export type WebFetchResult = {
     content: string;
     contentType: string;
 };
-
-/**
- * Result for a single URL within a batch fetch operation.
- *
- * @property url     The URL that was fetched.
- * @property success Whether the fetch succeeded.
- * @property title   Page title (present on success).
- * @property content Extracted plain-text content (present on success).
- * @property error   Error message (present on failure).
- */
-export type BatchWebFetchResultItem = {
-    url: string;
-    success: boolean;
-    title?: string;
-    content?: string;
-    error?: string;
-};

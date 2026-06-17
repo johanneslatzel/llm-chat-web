@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@johannes.latzel/llm-chat-web` is a consumer tool package that extends the `llm-chat` framework with web search and URL fetching tools.
+`@johannes.latzel/llm-chat-web` is a `ToolPackage` that extends the `llm-chat` framework with web search and URL fetching tools.
 
 ## Search providers
 
@@ -10,9 +10,13 @@
 
 ## Design
 
+### ToolPackage
+
+The `WebToolsPackage` class bundles `WebSearchTool` and `WebFetchTool` into a single `ToolPackage` (from `@johannes.latzel/llm-chat`). Register it with a `ToolSuite` via `suite.add(new WebToolsPackage())` to register both tools at once. The package accepts optional per-tool configurations; omitted configs default to environment-variable values.
+
 ### Tools
 
-Both `web_search` and `web_fetch` implement the abstract `Tool` from `@johannes.latzel/llm-chat`. 
+Each tool implements the abstract `Tool` from `@johannes.latzel/llm-chat`. Both tools accept arrays of inputs (`queries` for search, `urls` for fetch) and return chained `PartialToolResult` results via `ResultBuilder.from(results).build()`. Concurrency is managed by `p-map` with configurable limits per tool.
 
 ### HTTP client
 
@@ -25,9 +29,9 @@ Both `web_search` and `web_fetch` implement the abstract `Tool` from `@johannes.
 ### Configuration
 
 Each tool has its own configuration class:
-    - `web_search` uses `WebSearchConfiguration` (provider, API key, search-specific limits)
-    - `web_fetch` uses WebFetchConfiguration` (fetch-specific limits, timeouts).
-Both read from environment variables by default.
+    - `web_search` uses `WebSearchConfiguration` (provider, API key, search-specific limits, concurrency)
+    - `web_fetch` uses `WebFetchConfiguration` (fetch-specific limits, timeouts, concurrency)
+All read from environment variables by default.
 
 ---
 
@@ -96,6 +100,7 @@ type WebFetchResult = {
 
 ## Dependencies
 
-- `@johannes.latzel/llm-chat` — framework providing `Tool`, `ToolParameters`, `ResultStatus`, etc.
+- `@johannes.latzel/llm-chat` — framework providing `Tool`, `ToolParameters`, `ResultStatus`, `ResultBuilder`, etc.
 - `@mozilla/readability` — article content extraction
 - `jsdom` — server-side DOM for Readability integration
+- `p-map` — concurrency-limited parallel execution

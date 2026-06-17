@@ -17,5 +17,6 @@ nav:
     - Architecture: architecture.md
     - Environment Variables: configuration.md
     - Quick Start: quickstart.md
+    - Usage: usage.md
 plugins:
     - search

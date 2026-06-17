@@ -10,8 +10,7 @@ export const FETCH_TIMEOUT_DEFAULT_MS = 5_000;
 export const SEARCH_TIMEOUT_DEFAULT_MS = 4_000;
 /** User-Agent header value sent with all outgoing HTTP requests. */
 export const DEFAULT_USER_AGENT = 'llm-chat-web';
-const BATCH_FETCH_CONCURRENCY_DEFAULT = 3;
-const BATCH_FETCH_MAX_CONCURRENCY_DEFAULT = 10;
+const CONCURRENCY_DEFAULT = 3;
 
 /** Configuration for the web search tool.
  *
@@ -36,6 +35,7 @@ export class WebSearchConfiguration {
     maxResults: number = envInt('LLM_CHAT_WEB_SEARCH_MAX_RESULTS', 5);
     maxCharsPerResult: number = envInt('LLM_CHAT_WEB_SEARCH_MAX_CHARS_PER_RESULT', 2000);
     searchTimeoutMs: number = envInt('LLM_CHAT_WEB_SEARCH_TIMEOUT_MS', SEARCH_TIMEOUT_DEFAULT_MS);
+    concurrency: number = envInt('LLM_CHAT_WEB_SEARCH_CONCURRENCY', CONCURRENCY_DEFAULT);
 
     /**
      * @param provider Search provider to use. If omitted, resolved from
@@ -70,29 +70,5 @@ export class WebFetchConfiguration {
         'LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES',
         MAX_CONTENT_LENGTH_BYTES_DEFAULT
     );
-}
-
-/** Configuration for the batch-URL fetch tool.
- *
- * @property fetchConfig    Underlying single-fetch configuration.
- * @property concurrency    Max concurrent fetches (env: `LLM_CHAT_WEB_BATCH_FETCH_CONCURRENCY`).
- * @property maxConcurrency Hard upper limit a caller may request (env: `LLM_CHAT_WEB_BATCH_FETCH_MAX_CONCURRENCY`).
- */
-export class BatchWebFetchConfiguration {
-    fetchConfig: WebFetchConfiguration;
-    concurrency: number = envInt(
-        'LLM_CHAT_WEB_BATCH_FETCH_CONCURRENCY',
-        BATCH_FETCH_CONCURRENCY_DEFAULT
-    );
-    maxConcurrency: number = envInt(
-        'LLM_CHAT_WEB_BATCH_FETCH_MAX_CONCURRENCY',
-        BATCH_FETCH_MAX_CONCURRENCY_DEFAULT
-    );
-
-    /**
-     * @param fetchConfig Single-fetch configuration. Defaults to a fresh `WebFetchConfiguration`.
-     */
-    constructor(fetchConfig?: WebFetchConfiguration) {
-        this.fetchConfig = fetchConfig ?? new WebFetchConfiguration();
-    }
+    concurrency: number = envInt('LLM_CHAT_WEB_FETCH_CONCURRENCY', CONCURRENCY_DEFAULT);
 }

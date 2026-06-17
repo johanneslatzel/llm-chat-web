@@ -1,18 +1,57 @@
 # Usage
 
+## WebToolsPackage
+
+Both tools can be registered together as a single `ToolPackage`:
+
+```typescript
+import { WebToolsPackage } from '@johannes.latzel/llm-chat-web';
+
+// Register with a ToolSuite
+suite.add(new WebToolsPackage());
+// Registers: web_search, web_fetch
+```
+
+The package constructor accepts optional configuration per tool. If omitted, each config defaults to its environment-variable defaults:
+
+```typescript
+import {
+    WebToolsPackage,
+    WebSearchConfiguration,
+    WebFetchConfiguration
+} from '@johannes.latzel/llm-chat-web';
+
+const pkg = new WebToolsPackage(
+    new WebSearchConfiguration(),                     // optional
+    new WebFetchConfiguration()                       // optional
+);
+suite.add(pkg);
+```
+
+You can also override individual configs while leaving others at defaults by omitting the argument:
+
+```typescript
+// Only override search config, use defaults for fetch
+const pkg = new WebToolsPackage(
+    new WebSearchConfiguration(WebSearchProvider.Tavily, 'key')
+);
+```
+
 ## WebSearchTool (tool name: `web_search`)
 
-Search the web using DuckDuckGo, Tavily, or ExaAI.
+Search the web using DuckDuckGo, Tavily, or ExaAI. Accepts one or more queries — each query returns its own independent result in the chain.
 
 ### Parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `query` | `string` | yes | The search query |
-| `max_results` | `number` | no | Max results to return (default: config default, max: 20) |
+| `queries` | `string[]` | yes | Array of search queries |
+| `max_results` | `number` | no | Max results to return per query (default: config default, max: 20) |
 | `max_chars_per_result` | `number` | no | Max chars per result snippet (default: config default, max: 50000) |
 
 ### Returns
+
+Each query produces its own result:
 
 ```
 Search results for "query":
@@ -28,16 +67,26 @@ Search results for "query":
 import { WebSearchTool, WebSearchConfiguration } from '@johannes.latzel/llm-chat-web';
 
 const tool = new WebSearchTool(new WebSearchConfiguration(WebSearchProvider.Tavily, 'your-tavily-key'));
-const result = await tool.execute({ query: 'latest AI news' });
+const result = await tool.execute({ queries: ['latest AI news'] });
+// result[0].result contains the search results
 ```
 
-### Override Parameters Per-Query
+### Multiple Queries
 
-Each `execute()` call accepts optional `max_results` and `max_chars_per_result` that override the config defaults for that search only.
+```typescript
+const result = await tool.execute({ queries: ['AI news', 'space news'] });
+// result[0] -> search results for "AI news"
+// result[1] -> search results for "space news"
+// Each result has its own status (success or error)
+```
+
+### Override Parameters Per-Call
+
+Each `execute()` call accepts optional `max_results` and `max_chars_per_result` that override the config defaults for all queries.
 
 ```typescript
 const result = await tool.execute({
-    query: 'TypeScript 6.0 features',
+    queries: ['TypeScript 6.0 features'],
     max_results: 3,
     max_chars_per_result: 500
 });
@@ -72,27 +121,29 @@ const ddgTool = new WebSearchTool(ddgConfig);
 The tool never throws — errors are returned in the result:
 
 ```typescript
-const result = await tool.execute({ query: 'something' });
-if (result.status === 'error') {
-    console.error('Search failed:', result.result);
+const result = await tool.execute({ queries: ['something'] });
+if (result[0].status === 'error') {
+    console.error('Search failed:', result[0].result);
     return;
 }
-console.log(result.result);
+console.log(result[0].result);
 ```
 
 ## WebFetchTool (tool name: `web_fetch`)
 
-Fetch a URL and return its content as clean text (or raw HTML).
+Fetch one or more URLs in parallel and return their content as clean text (or raw). Each URL produces its own independent result.
 
 ### Parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `url` | `string` | yes | The URL to fetch |
-| `raw` | `boolean` | no | Return raw HTML instead of extracted text (default: `false`) |
-| `max_chars` | `number` | no | Override max characters returned (clamped to `[1, maxCharsPerFetchLimit]`) |
+| `urls` | `string[]` | yes | Array of URLs to fetch |
+| `raw` | `boolean` | no | Return raw response instead of extracted text per URL (default: `false`) |
+| `max_chars` | `number` | no | Override max characters returned per URL (clamped to `[1, maxCharsPerFetchLimit]`) |
 
 ### Returns
+
+Each URL produces its own result:
 
 ```
 Page Title
@@ -107,8 +158,17 @@ URL: https://final-url-after-redirects
 import { WebFetchTool, WebFetchConfiguration } from '@johannes.latzel/llm-chat-web';
 
 const tool = new WebFetchTool(new WebFetchConfiguration());
-const result = await tool.execute({ url: 'https://example.com/article' });
-// result.result contains the title, extracted text, and final URL
+const result = await tool.execute({ urls: ['https://example.com/article'] });
+// result[0].result contains the title, extracted text, and final URL
+```
+
+### Multiple URLs
+
+```typescript
+const result = await tool.execute({ urls: ['https://example.com/a', 'https://example.com/b'] });
+// result[0] -> content for first URL
+// result[1] -> content for second URL
+// Each result has its own status (success or error)
 ```
 
 ### Content extraction
@@ -138,78 +198,19 @@ Before downloading the full response, the tool sends a `HEAD` request to check t
 Non-HTML and non-plain-text content (PDFs, images, etc.) are rejected with an error.
 
 ```typescript
-const result = await tool.execute({ url: 'https://example.com/doc.pdf' });
-// result.result === "Unsupported content type: application/pdf. Only HTML and plain text are supported."
+const result = await tool.execute({ urls: ['https://example.com/doc.pdf'] });
+// result[0].result === "https://example.com/doc.pdf: Unsupported content type: application/pdf. Only HTML and plain text are supported."
 ```
 
 ### Examples
 
 ```typescript
 // Raw HTML
-const raw = await tool.execute({ url: 'https://example.com', raw: true });
+const raw = await tool.execute({ urls: ['https://example.com'], raw: true });
 
 // Custom character limit
-const limited = await tool.execute({ url: 'https://example.com', max_chars: 500 });
+const limited = await tool.execute({ urls: ['https://example.com'], max_chars: 500 });
+
+// Multiple URLs with independent error handling
+const multi = await tool.execute({ urls: ['https://a.com', 'https://b.com', 'https://c.com'] });
 ```
-
-## BatchWebFetchTool (tool name: `batch_web_fetch`)
-
-Fetches multiple URLs in parallel and returns their content as clean text. Uses [`p-map`](https://github.com/sindresorhus/p-map) for concurrency control.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `urls` | `string` (JSON array) | yes | JSON array of URLs, e.g. `'["https://a.com", "https://b.com"]'` |
-| `max_chars` | `number` | no | Max characters per URL (default: config default, max: 100000) |
-| `raw` | `boolean` | no | Return raw response instead of extracted text per URL (default: `false`) |
-| `concurrency` | `number` | no | Max concurrent fetches (default: config default, max: 10) |
-
-### Returns
-
-```
-Batch fetch complete: 2/3 URLs succeeded, 1 failed.
-
-[1] https://example.com/a
-Page Title
-
-Extracted text...
-URL: https://example.com/a
-
----
-
-[2] https://example.com/b
-Page Title
-
-Extracted text...
-URL: https://example.com/b
-
----
-
-[3] https://example.com/c
-Error: HTTP error 404: Not Found
-```
-
-Each URL is fetched independently — a failure in one does not affect the others. Status is `success` if at least one URL succeeds, `error` if all fail.
-
-### Basic batch fetch
-
-```typescript
-import { BatchWebFetchTool, BatchWebFetchConfiguration } from '@johannes.latzel/llm-chat-web';
-
-const tool = new BatchWebFetchTool(new BatchWebFetchConfiguration());
-const result = await tool.execute({
-    urls: '["https://example.com/article", "https://example.org/doc"]'
-});
-```
-
-### Override concurrency
-
-```typescript
-const result = await tool.execute({
-    urls: '["https://a.com", "https://b.com", "https://c.com"]',
-    concurrency: 5
-});
-```
-
-Each URL uses the same fetch pipeline as `WebFetchTool` (content-size guard via HEAD, content-type guard, Readability extraction, truncation).

@@ -1,6 +1,6 @@
 # Environment Variables
 
-## Environment Variables
+All variables are optional. Constructor parameters take precedence over environment variables.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -17,8 +17,6 @@
 | `LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES` | `10000000` | Max bytes accepted before rejecting the fetch (checked via HEAD) |
 
 ## WebSearchConfiguration
-
-Configuration for the `WebSearchTool`.
 
 ### Constructor
 
@@ -40,8 +38,6 @@ If omitted, values are read from environment variables. DuckDuckGo is the defaul
 | `concurrency` | `number` | `3` | `LLM_CHAT_WEB_SEARCH_CONCURRENCY` | Concurrency limit for parallel searches |
 
 ## WebFetchConfiguration
-
-Configuration for the `WebFetchTool`.
 
 ### Constructor
 

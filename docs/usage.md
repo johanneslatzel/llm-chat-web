@@ -7,7 +7,6 @@ Both tools can be registered together as a single `ToolPackage`:
 ```typescript
 import { WebToolsPackage } from '@johannes.latzel/llm-chat-web';
 
-// Register with a ToolSuite
 suite.add(new WebToolsPackage());
 // Registers: web_search, web_fetch
 ```
@@ -22,8 +21,8 @@ import {
 } from '@johannes.latzel/llm-chat-web';
 
 const pkg = new WebToolsPackage(
-    new WebSearchConfiguration(),                     // optional
-    new WebFetchConfiguration()                       // optional
+    new WebSearchConfiguration(),
+    new WebFetchConfiguration()
 );
 suite.add(pkg);
 ```
@@ -31,7 +30,6 @@ suite.add(pkg);
 You can also override individual configs while leaving others at defaults by omitting the argument:
 
 ```typescript
-// Only override search config, use defaults for fetch
 const pkg = new WebToolsPackage(
     new WebSearchConfiguration(WebSearchProvider.Tavily, 'key')
 );
@@ -68,7 +66,7 @@ import { WebSearchTool, WebSearchConfiguration } from '@johannes.latzel/llm-chat
 
 const tool = new WebSearchTool(new WebSearchConfiguration(WebSearchProvider.Tavily, 'your-tavily-key'));
 const result = await tool.execute({ queries: ['latest AI news'] });
-// result[0].result contains the search results
+console.log(result[0].result);
 ```
 
 ### Multiple Queries
@@ -77,12 +75,9 @@ const result = await tool.execute({ queries: ['latest AI news'] });
 const result = await tool.execute({ queries: ['AI news', 'space news'] });
 // result[0] -> search results for "AI news"
 // result[1] -> search results for "space news"
-// Each result has its own status (success or error)
 ```
 
 ### Override Parameters Per-Call
-
-Each `execute()` call accepts optional `max_results` and `max_chars_per_result` that override the config defaults for all queries.
 
 ```typescript
 const result = await tool.execute({
@@ -94,16 +89,12 @@ const result = await tool.execute({
 
 ### Switch Provider
 
-Pass a provider to the config:
-
 ```typescript
 import { WebSearchTool, WebSearchConfiguration, WebSearchProvider } from '@johannes.latzel/llm-chat-web';
 
-// ExaAI
 const exaConfig = new WebSearchConfiguration(WebSearchProvider.ExaAI, 'your-exa-key');
 const exaTool = new WebSearchTool(exaConfig);
 
-// DuckDuckGo (no API key)
 const ddgConfig = new WebSearchConfiguration(WebSearchProvider.DuckDuckGo);
 const ddgTool = new WebSearchTool(ddgConfig);
 ```
@@ -116,29 +107,15 @@ const ddgTool = new WebSearchTool(ddgConfig);
 | **Tavily** | Required | Varies by plan |
 | **ExaAI** | Required | Varies by plan |
 
-## Error Handling
-
-The tool never throws — errors are returned in the result:
-
-```typescript
-const result = await tool.execute({ queries: ['something'] });
-if (result[0].status === 'error') {
-    console.error('Search failed:', result[0].result);
-    return;
-}
-console.log(result[0].result);
-```
-
 ## WebFetchTool (tool name: `web_fetch`)
 
-Fetch one or more URLs in parallel and return their content as clean text (or raw). Each URL produces its own independent result.
+Fetch one or more URLs in parallel and return their content as clean text. Each URL produces its own independent result.
 
 ### Parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `urls` | `string[]` | yes | Array of URLs to fetch |
-| `raw` | `boolean` | no | Return raw response instead of extracted text per URL (default: `false`) |
 | `max_chars` | `number` | no | Override max characters returned per URL (clamped to `[1, maxCharsPerFetchLimit]`) |
 
 ### Returns
@@ -159,7 +136,7 @@ import { WebFetchTool, WebFetchConfiguration } from '@johannes.latzel/llm-chat-w
 
 const tool = new WebFetchTool(new WebFetchConfiguration());
 const result = await tool.execute({ urls: ['https://example.com/article'] });
-// result[0].result contains the title, extracted text, and final URL
+console.log(result[0].result);
 ```
 
 ### Multiple URLs
@@ -168,49 +145,73 @@ const result = await tool.execute({ urls: ['https://example.com/article'] });
 const result = await tool.execute({ urls: ['https://example.com/a', 'https://example.com/b'] });
 // result[0] -> content for first URL
 // result[1] -> content for second URL
-// Each result has its own status (success or error)
 ```
+
+### Custom character limit
+
+```typescript
+const result = await tool.execute({ urls: ['https://example.com'], max_chars: 500 });
+```
+
+### Content-type handling
+
+The tool dispatches the response content type to a registered handler from `FetchRegistry`:
+
+| Content type | Handling |
+|---|---|
+| `text/html` | Extracted with Readability (clean text) |
+| `application/json` | Pretty-printed with indentation |
+| `application/xml` / `text/xml` | Returned as-is |
+| `text/csv` | Returned as-is |
+| `text/markdown` | Returned as-is |
+| `text/plain` | Returned as-is |
+| Other `text/*` | Returned as-is |
+| Other types | Rejected with "Unsupported content type" |
+
+See [architecture](architecture.md#content-type-handler-dispatch) for the dispatch mechanism. To supply custom handlers that take priority over the built-in defaults:
+
+```typescript
+import { WebFetchTool, WebFetchConfiguration, FetchRegistry, ResultStatus } from '@johannes.latzel/llm-chat-web';
+
+const registry = new FetchRegistry();
+registry.register({
+    name: 'my-handler',
+    match: (ct) => ct.startsWith('text/html'),
+    handle: (body, url, responseUrl, maxChars) => {
+        return { result: body, status: ResultStatus.Success };
+    }
+});
+// Built-in defaults are NOT added since a handler is already registered.
+// Call registry.init() to append defaults after your custom handler.
+
+const tool = new WebFetchTool(new WebFetchConfiguration(), registry);
+```
+
+### JSON pretty-printing
+
+Valid JSON responses are parsed and re-serialized with indentation for readability. If the response body is not valid JSON, the tool returns an error.
 
 ### Content extraction
 
-By default, the tool converts HTML to clean text:
-
-1. Parses HTML with `JSDOM`
-2. Strips `<script>`, `<style>`, `<noscript>`, `<iframe>`
-3. Runs Mozilla's Readability to extract article content
-4. Falls back to CSS selectors (`article`, `main`, `[role="main"]`, etc.) if Readability returns nothing useful
-5. Last resort: uses `document.body.textContent`
+See [architecture](architecture.md#content-extraction) for the full HTML extraction pipeline. In short: JSDOM parses the page, Mozilla Readability extracts the article, and content selectors serve as fallback.
 
 ### Truncation
 
-If the extracted content exceeds `max_chars`, it is truncated at the nearest boundary — paragraph break → sentence break → word break → hard character cut. A `... [truncated]` marker is appended.
-
-### Raw mode
-
-Pass `raw: true` to return the raw response body instead of extracted text. Raw mode accepts any content type and skips the content-type guard — useful for JSON APIs, XML, or other text-based formats.
+When content exceeds `max_chars`, the tool truncates at the nearest boundary — paragraph break, sentence break, word break, or hard character cut. A `... [truncated]` marker is appended. See [architecture](architecture.md#truncation) for the detailed algorithm.
 
 ### Content-size guard
 
-Before downloading the full response, the tool sends a `HEAD` request to check the `Content-Length` header. If the declared size exceeds `maxContentLengthBytes`, the request is rejected immediately without downloading.
+Before downloading, the tool sends a `HEAD` request to check `Content-Length`. If the declared size exceeds `maxContentLengthBytes`, the request is rejected immediately. See [architecture](architecture.md#content-size-guard) for details.
 
-### Content-type guard
+## Error Handling
 
-Non-HTML and non-plain-text content (PDFs, images, etc.) are rejected with an error.
-
-```typescript
-const result = await tool.execute({ urls: ['https://example.com/doc.pdf'] });
-// result[0].result === "https://example.com/doc.pdf: Unsupported content type: application/pdf. Only HTML and plain text are supported."
-```
-
-### Examples
+Tools never throw — errors are returned in the result:
 
 ```typescript
-// Raw HTML
-const raw = await tool.execute({ urls: ['https://example.com'], raw: true });
-
-// Custom character limit
-const limited = await tool.execute({ urls: ['https://example.com'], max_chars: 500 });
-
-// Multiple URLs with independent error handling
-const multi = await tool.execute({ urls: ['https://a.com', 'https://b.com', 'https://c.com'] });
+const result = await tool.execute({ queries: ['something'] });
+if (result[0].status === 'error') {
+    console.error('Search failed:', result[0].result);
+    return;
+}
+console.log(result[0].result);
 ```

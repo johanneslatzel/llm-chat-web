@@ -87,15 +87,7 @@ describe('WebFetchTool', () => {
         expect(result[0]!.result).toContain('fetch error');
     });
 
-    it('raw: true returns unprocessed HTML', async () => {
-        mockFetch(htmlResponse('<html><body>Raw HTML</body></html>'));
-        const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], raw: true });
-        expect(result[0]!.status).toBe(ResultStatus.Success);
-        expect(result[0]!.result).toContain('Raw HTML');
-    });
-
-    it('raw: true accepts non-HTML content types', async () => {
+    it('handles JSON content-type without needing raw', async () => {
         mockFetch({
             ok: true,
             status: 200,
@@ -104,9 +96,52 @@ describe('WebFetchTool', () => {
             headers: { 'content-type': 'application/json' }
         });
         const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com/data.json'], raw: true });
+        const result = await tool.execute({ urls: ['https://example.com/data.json'] });
         expect(result[0]!.status).toBe(ResultStatus.Success);
-        expect(result[0]!.result).toContain('{"key": "value"}');
+        expect(result[0]!.result).toContain('"key": "value"');
+    });
+
+    it('pretty-prints JSON responses', async () => {
+        mockFetch({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            body: '{"a":1,"b":{"c":2}}',
+            headers: { 'content-type': 'application/json' }
+        });
+        const tool = new WebFetchTool(cfg);
+        const result = await tool.execute({ urls: ['https://example.com/data.json'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('"a": 1');
+        expect(result[0]!.result).toContain('"c": 2');
+    });
+
+    it('handles XML content-type automatically', async () => {
+        mockFetch({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            body: '<root><item>value</item></root>',
+            headers: { 'content-type': 'application/xml' }
+        });
+        const tool = new WebFetchTool(cfg);
+        const result = await tool.execute({ urls: ['https://example.com/data.xml'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('<root><item>value</item></root>');
+    });
+
+    it('handles CSV content-type automatically', async () => {
+        mockFetch({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            body: 'name,age\nAlice,30',
+            headers: { 'content-type': 'text/csv' }
+        });
+        const tool = new WebFetchTool(cfg);
+        const result = await tool.execute({ urls: ['https://example.com/data.csv'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('Alice');
     });
 
     it('truncates content exceeding max_chars', async () => {
@@ -136,7 +171,7 @@ describe('WebFetchTool', () => {
         expect(result[0]!.status).toBe(ResultStatus.Success);
     });
 
-    it('rejects non-HTML content-type', async () => {
+    it('rejects unsupported content-type', async () => {
         mockFetch({
             ok: true,
             status: 200,
@@ -191,15 +226,6 @@ describe('WebFetchTool', () => {
         mockFetch(htmlResponse('some text here'));
         const tool = new WebFetchTool(cfg);
         const result = await tool.execute({ urls: ['https://example.com'], max_chars: 5 });
-        expect(result[0]!.status).toBe(ResultStatus.Success);
-        expect(result[0]!.result).toContain('[truncated]');
-    });
-
-    it('truncates at paragraph boundary in raw mode', async () => {
-        const textWithParas = 'P1 text.\n\nP2 text.\n\nP3 text.\n\nP4 text.\n\nP5 text.\n\nP6 text.\n\nP7 text.';
-        mockFetch(htmlResponse(textWithParas));
-        const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], raw: true, max_chars: 50 });
         expect(result[0]!.status).toBe(ResultStatus.Success);
         expect(result[0]!.result).toContain('[truncated]');
     });
@@ -338,46 +364,11 @@ describe('WebFetchTool', () => {
         expect(result[1]!.status).toBe(ResultStatus.Error);
     });
 
-    it('truncates at paragraph boundary in non-raw mode', async () => {
+    it('truncates at paragraph boundary', async () => {
         const textWithParas = 'P1 text.\n\nP2 text.\n\nP3 text.\n\nP4 text.\n\nP5 text.\n\nP6 text.\n\nP7 text.';
         mockFetch(htmlResponse(textWithParas));
         const tool = new WebFetchTool(cfg);
         const result = await tool.execute({ urls: ['https://example.com'], max_chars: 50 });
-        expect(result[0]!.status).toBe(ResultStatus.Success);
-        expect(result[0]!.result).toContain('[truncated]');
-    });
-
-    it('truncates at sentence boundary in raw mode', async () => {
-        const text = 'Sentence one. Sentence two. Sentence three. Sentence four. Sentence five. Sentence six. Sentence seven.';
-        mockFetch(htmlResponse(text));
-        const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], raw: true, max_chars: 100 });
-        expect(result[0]!.status).toBe(ResultStatus.Success);
-        expect(result[0]!.result).toContain('[truncated]');
-    });
-
-    it('truncates at word boundary when no sentence break in raw mode', async () => {
-        const text = 'word '.repeat(200);
-        mockFetch(htmlResponse(text));
-        const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], raw: true, max_chars: 100 });
-        expect(result[0]!.status).toBe(ResultStatus.Success);
-        expect(result[0]!.result).toContain('[truncated]');
-    });
-
-    it('truncates at hard cut in raw mode when no other boundary available', async () => {
-        const text = 'A'.repeat(500);
-        mockFetch(htmlResponse(text));
-        const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], raw: true, max_chars: 50 });
-        expect(result[0]!.status).toBe(ResultStatus.Success);
-        expect(result[0]!.result).toContain('[truncated]');
-    });
-
-    it('returns marker-only when budget exhausted by truncation overhead in raw mode', async () => {
-        mockFetch(htmlResponse('some text here'));
-        const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], raw: true, max_chars: 5 });
         expect(result[0]!.status).toBe(ResultStatus.Success);
         expect(result[0]!.result).toContain('[truncated]');
     });

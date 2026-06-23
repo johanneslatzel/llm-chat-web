@@ -1,6 +1,6 @@
 import { WebFetchConfiguration } from '../lib/config.js';
 import { fetchWithTimeout, getContentLength } from '../lib/http.js';
-import { extractText } from '../lib/extract.js';
+import { FetchRegistry } from '../lib/fetch-registry.js';
 import {
     PropertyType,
     ResultBuilder,
@@ -12,67 +12,33 @@ import {
 import type { PartialToolResult } from '@johannes.latzel/llm-chat';
 import pMap from 'p-map';
 
-/**
- * Truncate extracted (non-raw) text at a natural boundary (paragraph, sentence, or word).
- *
- * @param text     The text to truncate.
- * @param maxChars Maximum allowed characters.
- * @returns Truncated text with a "[truncated]" marker appended.
- */
-function truncate(text: string, maxChars: number): string {
-    if (text.length <= maxChars) return text;
-
-    const marker = '... [truncated]';
-    const budget = maxChars - marker.length;
-    if (budget <= 0) return marker;
-
-    const before = text.slice(0, budget);
-
-    const lastPara = before.lastIndexOf('\n\n');
-    if (lastPara > budget * 0.5) {
-        return before.slice(0, lastPara) + '\n\n' + marker;
-    }
-
-    const lastSentence = before.lastIndexOf('. ');
-    if (lastSentence > budget * 0.3) {
-        return before.slice(0, lastSentence + 1) + ' ' + marker;
-    }
-
-    const lastSpace = before.lastIndexOf(' ');
-    if (lastSpace > 0) {
-        return before.slice(0, lastSpace) + ' ' + marker;
-    }
-
-    return before + marker;
-}
-
-/** Tool that fetches one or more URLs and returns their content as extracted plain text (or raw). */
+/** Tool that fetches one or more URLs and returns their content as clean text. */
 export class WebFetchTool extends Tool {
     private readonly config: WebFetchConfiguration;
+    private readonly registry: FetchRegistry;
 
     /**
-     * @param config Fetch configuration (timeout, size limits, etc.).
+     * @param config   Fetch configuration (timeout, size limits, etc.).
+     * @param registry Optional custom content handler registry. Defaults to the built-in registry.
      */
-    constructor(config: WebFetchConfiguration) {
+    constructor(config: WebFetchConfiguration, registry?: FetchRegistry) {
         super(
             'web_fetch',
-            'Fetches one or more URLs in parallel and returns their content as clean text. Pass an array of URLs ("urls"). Use this when you need to read the full content of web pages, articles, or documentation.',
+            'Fetches one or more URLs in parallel and returns their content as clean text. Pass an array of URLs ("urls"). Use this when you need to read web pages, JSON APIs, XML feeds, or other text-based content.',
             new ToolParameters(
                 {
                     urls: new ToolParameterProperty('Array of URLs to fetch', PropertyType.Array),
                     max_chars: new ToolParameterProperty(
                         'Maximum characters to return per URL (default: 10000, max: 100000)',
                         PropertyType.Number
-                    ),
-                    raw: new ToolParameterProperty(
-                        'If true, return raw response instead of extracted text for each URL (e.g. json, xml or source code response expected)',
-                        PropertyType.Boolean
                     )
                 },
                 ['urls']
             )
         );
         this.config = config;
+        this.registry = registry ?? new FetchRegistry();
+        this.registry.init();
     }
 
     /**
@@ -80,7 +46,6 @@ export class WebFetchTool extends Tool {
      *
      * @param args.urls       The array of URLs to fetch (required).
      * @param args.max_chars  Max characters to return per URL (default: config default, max: config limit).
-     * @param args.raw        If true, return raw response instead of extracted text.
      */
     protected async onExecute(args: Record<string, unknown>): Promise<PartialToolResult> {
         const rawUrls = args.urls;
@@ -91,7 +56,6 @@ export class WebFetchTool extends Tool {
             };
         }
 
-        const raw = args.raw === true;
         const maxChars =
             typeof args.max_chars === 'number'
                 ? Math.max(
@@ -102,7 +66,7 @@ export class WebFetchTool extends Tool {
 
         const concurrency = Math.max(1, this.config.concurrency);
 
-        const promises = rawUrls.map((u) => () => this.fetchSingleUrl(u, maxChars, raw));
+        const promises = rawUrls.map((u) => () => this.fetchSingleUrl(u, maxChars));
 
         try {
             const results = await pMap(promises, (fn) => fn(), {
@@ -123,14 +87,9 @@ export class WebFetchTool extends Tool {
      *
      * @param url      The URL to fetch.
      * @param maxChars Max characters to return.
-     * @param raw      If true, return raw response instead of extracted text.
      * @returns A PartialToolResult with the fetched content or an error.
      */
-    private async fetchSingleUrl(
-        url: unknown,
-        maxChars: number,
-        raw: boolean
-    ): Promise<PartialToolResult> {
+    private async fetchSingleUrl(url: unknown, maxChars: number): Promise<PartialToolResult> {
         if (typeof url !== 'string' || !url.trim()) {
             return {
                 result: 'URL must be a non-empty string',
@@ -163,35 +122,19 @@ export class WebFetchTool extends Tool {
                 };
             }
 
-            if (!raw) {
-                const contentType = response.headers.get('content-type') || 'text/plain';
+            const contentType = response.headers.get('content-type') || 'text/plain';
 
-                if (!contentType.startsWith('text/html') && !contentType.startsWith('text/plain')) {
-                    return {
-                        result: `${trimmedUrl}: Unsupported content type: ${contentType}. Only HTML and plain text are supported.`,
-                        status: ResultStatus.Error
-                    };
-                }
+            const handler = this.registry.getHandler(contentType);
+            if (!handler) {
+                return {
+                    result: `${trimmedUrl}: Unsupported content type: ${contentType}`,
+                    status: ResultStatus.Error
+                };
             }
 
             const body = await response.text();
 
-            if (raw) {
-                return {
-                    result: truncate(body, maxChars),
-                    status: ResultStatus.Success
-                };
-            }
-
-            const extracted = extractText(body, trimmedUrl);
-            const title = extracted.title || trimmedUrl;
-            const content = truncate(extracted.textContent, maxChars);
-            const result = `${title}\n\n${content}\n\nURL: ${response.url || trimmedUrl}`;
-
-            return {
-                result,
-                status: ResultStatus.Success
-            };
+            return await handler.handle(body, trimmedUrl, response.url || trimmedUrl, maxChars);
         } catch (e) {
             const message = e instanceof Error ? e.message : 'Unknown fetch error';
             return {

@@ -24,17 +24,24 @@ const CONCURRENCY_DEFAULT = 3;
  * @property maxResults       Max results returned per query (env: `LLM_CHAT_WEB_SEARCH_MAX_RESULTS`).
  * @property maxCharsPerResult Max characters per result snippet (env: `LLM_CHAT_WEB_SEARCH_MAX_CHARS_PER_RESULT`).
  * @property searchTimeoutMs  Timeout per search-API call in ms (env: `LLM_CHAT_WEB_SEARCH_TIMEOUT_MS`).
+ * @property concurrency      Max concurrent search queries (env: `LLM_CHAT_WEB_SEARCH_CONCURRENCY`).
  */
 export class WebSearchConfiguration {
+    /** API key for paid search providers (Tavily, ExaAI). Falls back to `LLM_CHAT_WEB_SEARCH_API_KEY`. */
     apiKey: string = envString('LLM_CHAT_WEB_SEARCH_API_KEY', '');
+    /** Which search backend to use. Falls back to `LLM_CHAT_WEB_SEARCH_PROVIDER`. */
     provider: WebSearchProvider = envEnum(
         'LLM_CHAT_WEB_SEARCH_PROVIDER',
         Object.values(WebSearchProvider) as WebSearchProvider[],
         WebSearchProvider.DuckDuckGo
     );
+    /** Max results returned per query (env: `LLM_CHAT_WEB_SEARCH_MAX_RESULTS`). */
     maxResults: number = envInt('LLM_CHAT_WEB_SEARCH_MAX_RESULTS', 5);
+    /** Max characters per result snippet (env: `LLM_CHAT_WEB_SEARCH_MAX_CHARS_PER_RESULT`). */
     maxCharsPerResult: number = envInt('LLM_CHAT_WEB_SEARCH_MAX_CHARS_PER_RESULT', 2000);
+    /** Timeout per search-API call in ms (env: `LLM_CHAT_WEB_SEARCH_TIMEOUT_MS`). */
     searchTimeoutMs: number = envInt('LLM_CHAT_WEB_SEARCH_TIMEOUT_MS', SEARCH_TIMEOUT_DEFAULT_MS);
+    /** Max concurrent search queries (env: `LLM_CHAT_WEB_SEARCH_CONCURRENCY`). */
     concurrency: number = envInt('LLM_CHAT_WEB_SEARCH_CONCURRENCY', CONCURRENCY_DEFAULT);
 
     /**
@@ -49,26 +56,25 @@ export class WebSearchConfiguration {
     }
 }
 
-/** Configuration for the single-URL fetch tool.
- *
- * @property maxCharsPerFetch      Default max chars returned per fetch (env: `LLM_CHAT_WEB_MAX_CHARS_PER_FETCH`).
- * @property maxCharsPerFetchLimit Hard upper limit a caller may request (env: `LLM_CHAT_WEB_MAX_CHARS_PER_FETCH_LIMIT`).
- * @property fetchTimeoutMs        Timeout per individual fetch in ms (env: `LLM_CHAT_WEB_FETCH_TIMEOUT_MS`).
- * @property maxContentLengthBytes Maximum allowed response body length before rejection (env: `LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES`).
- */
+/** Configuration for the single-URL fetch tool. */
 export class WebFetchConfiguration {
+    /** Default max chars returned per fetch (env: `LLM_CHAT_WEB_MAX_CHARS_PER_FETCH`). */
     maxCharsPerFetch: number = envInt(
         'LLM_CHAT_WEB_MAX_CHARS_PER_FETCH',
         MAX_CHARS_PER_FETCH_DEFAULT
     );
+    /** Hard upper limit a caller may request (env: `LLM_CHAT_WEB_MAX_CHARS_PER_FETCH_LIMIT`). */
     maxCharsPerFetchLimit: number = envInt(
         'LLM_CHAT_WEB_MAX_CHARS_PER_FETCH_LIMIT',
         MAX_CHARS_PER_FETCH_LIMIT
     );
+    /** Timeout per individual fetch in ms (env: `LLM_CHAT_WEB_FETCH_TIMEOUT_MS`). */
     fetchTimeoutMs: number = envInt('LLM_CHAT_WEB_FETCH_TIMEOUT_MS', FETCH_TIMEOUT_DEFAULT_MS);
+    /** Maximum allowed response body length before rejection (env: `LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES`). */
     maxContentLengthBytes: number = envInt(
         'LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES',
         MAX_CONTENT_LENGTH_BYTES_DEFAULT
     );
+    /** Max concurrent fetch requests (env: `LLM_CHAT_WEB_FETCH_CONCURRENCY`). */
     concurrency: number = envInt('LLM_CHAT_WEB_FETCH_CONCURRENCY', CONCURRENCY_DEFAULT);
 }

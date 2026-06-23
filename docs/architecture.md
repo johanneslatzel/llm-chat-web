@@ -2,44 +2,75 @@
 
 ## Overview
 
-`@johannes.latzel/llm-chat-web` is a `ToolPackage` that extends the `llm-chat` framework with web search and URL fetching tools.
+`@johannes.latzel/llm-chat-web` extends the `llm-chat` framework with web search and URL fetching tools — supporting three search providers (DuckDuckGo, Tavily, ExaAI), HTML content extraction via Mozilla Readability, configurable content-type dispatch, and size-limited fetches with concurrency control.
 
-## Search providers
-
-// describe search providers and how to implement a custom provider
 
 ## Design
 
-### ToolPackage
+### Tool classes
 
-The `WebToolsPackage` class bundles `WebSearchTool` and `WebFetchTool` into a single `ToolPackage` (from `@johannes.latzel/llm-chat`). Register it with a `ToolSuite` via `suite.add(new WebToolsPackage())` to register both tools at once. The package accepts optional per-tool configurations; omitted configs default to environment-variable values.
+Each tool extends `Tool` from `@johannes.latzel/llm-chat`. Both accept arrays of inputs (`queries` for search, `urls` for fetch) and return chained `PartialToolResult` results via `ResultBuilder.from(results).build()`. `p-map` manages concurrency with per-tool limits.
 
-### Tools
+All errors are caught and returned as plain-string messages — tools never throw.
 
-Each tool implements the abstract `Tool` from `@johannes.latzel/llm-chat`. Both tools accept arrays of inputs (`queries` for search, `urls` for fetch) and return chained `PartialToolResult` results via `ResultBuilder.from(results).build()`. Concurrency is managed by `p-map` with configurable limits per tool.
+### WebToolsPackage
+
+The package bundles `WebSearchTool` and `WebFetchTool` into a single `ToolPackage`. It accepts optional per-tool configurations; omitted configs default to environment-variable values.
 
 ### HTTP client
 
-`fetchWithTimeout(url, options?)` wraps native `fetch()` with:
+`fetchWithTimeout(url, options?)` wraps native `fetch()`:
 
-- **Timeout**: uses `AbortSignal.timeout(ms)`
-- **User-Agent**: custom constant `llm-chat-web`, set via headers
-- **Custom headers**: override `SearchProvider.headers()`
+- **Timeout**: `AbortSignal.timeout(ms)`
+- **User-Agent**: constant `llm-chat-web`
+- **Custom headers**: overridable via `SearchProvider.headers()`
 
-### Configuration
+### Search providers
 
-Each tool has its own configuration class:
-    - `web_search` uses `WebSearchConfiguration` (provider, API key, search-specific limits, concurrency)
-    - `web_fetch` uses `WebFetchConfiguration` (fetch-specific limits, timeouts, concurrency)
-All read from environment variables by default.
+The search tool delegates to one of three providers, each implementing the abstract `SearchProvider` class:
 
----
+```typescript
+abstract class SearchProvider {
+    protected headers: Record<string, string>;
+    abstract search(query: string, maxResults: number, maxCharsPerResult: number): Promise<WebSearchResult[]>;
+}
+```
+
+| Provider | Class | Auth | Method |
+|---|---|---|---|
+| DuckDuckGo | `DuckDuckGoProvider` | None | HTML scraping |
+| Tavily | `TavilyProvider` | API key | REST API (POST, Bearer token) |
+| ExaAI | `ExaAIProvider` | API key | REST API (POST, Bearer token) |
+
+Providers that require an API key extend `ApiKeySearchProvider`, which adds `Content-Type` and `Authorization` headers and provides a `postJson()` convenience method.
+
+To implement a custom provider, extend `SearchProvider` (or `ApiKeySearchProvider`) and implement `search()`. The provider is then injected via `WebSearchConfiguration`:
+
+```typescript
+import { SearchProvider, WebSearchConfiguration, WebSearchTool, type WebSearchResult } from '@johannes.latzel/llm-chat-web';
+
+class MyProvider extends SearchProvider {
+    async search(query: string, maxResults: number, maxCharsPerResult: number): Promise<WebSearchResult[]> {
+        const response = await this.fetchUrl('https://api.example.com/search', 'MyProvider', {
+            method: 'POST',
+            body: JSON.stringify({ query, maxResults })
+        });
+        const data = await response.json();
+        return data.results.map((r: any) => ({
+            title: r.title,
+            url: r.url,
+            content: r.snippet.slice(0, maxCharsPerResult),
+        }));
+    }
+}
+
+const config = new WebSearchConfiguration(new MyProvider(5000));
+const tool = new WebSearchTool(config);
+```
 
 ### WebSearchTool specifics
 
-The search tool delegates to one of three providers — DuckDuckGo (HTML scraping), Tavily (REST API), or ExaAI (REST API) — each with its own request format and response parsing. All three use `AbortSignal.timeout(ms)` from the shared HTTP client.
-
----
+The tool constructs the right provider based on configuration and delegates each query independently. Timeouts and headers use the shared HTTP client.
 
 ### WebFetchTool specifics
 
@@ -50,7 +81,7 @@ The search tool delegates to one of three providers — DuckDuckGo (HTML scrapin
 1. **Parse** with `JSDOM`
 2. **Strip** `<script>`, `<style>`, `<noscript>`, `<iframe>` from the DOM
 3. **Gate** with `isProbablyReaderable()` — if false, skip Readability
-4. **Extract** with `Readability.parse()` — if result is `< ~100 chars`, fall through
+4. **Extract** with `Readability.parse()` — if result is < ~100 chars, fall through
 5. **Fallback** probe content selectors: `article`, `main`, `[role="main"]`, `.post-content`, `.entry-content`, `.content`. If none match, use `document.body.textContent`.
 
 Returns `{ title, textContent, content, excerpt, byline, siteName }`.
@@ -70,33 +101,11 @@ A `... [truncated]` marker is appended (included in the character budget).
 
 Before downloading, the tool sends a `HEAD` request to check `Content-Length`. If it exceeds the configured limit, the fetch is rejected immediately.
 
-#### Content-type guard
+#### Content-type handler dispatch
 
-Non-HTML/plain-text responses (PDFs, images, etc.) are rejected with a clear error message. This check is skipped in raw mode — any content type is accepted.
+When a response is received, `WebFetchTool` looks up the `Content-Type` header in a `FetchRegistry` — a list of `ContentHandler` instances checked in registration order. The first handler whose `match()` returns `true` processes the body via `handle()`.
 
-## Result types
-
-### WebSearchResult
-
-```typescript
-type WebSearchResult = {
-    title: string;
-    url: string;
-    content: string;
-    score?: number;
-};
-```
-
-### WebFetchResult
-
-```typescript
-type WebFetchResult = {
-    title: string;
-    url: string;
-    content: string;
-    contentType: string;
-};
-```
+`WebFetchTool` creates its own `FetchRegistry` if none is provided. The registry is lazy-initialized: `init()` is called on the first fetch, and built-in defaults are populated only if no custom handlers were registered beforehand. This lets you supply a registry with custom handlers that take priority (see [usage](usage.md#content-type-handling) for the handler table and examples).
 
 ## Dependencies
 

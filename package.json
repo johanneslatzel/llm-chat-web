@@ -1,6 +1,6 @@
 {
     "name": "@johannes.latzel/llm-chat-web",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "description": "Web tool suite for the llm-chat ecosystem",
     "license": "MIT",
     "files": [
@@ -60,7 +60,7 @@
         ]
     },
     "dependencies": {
-        "@johannes.latzel/llm-chat": "^0.5.0",
+        "@johannes.latzel/llm-chat": "^0.6.0",
         "@mozilla/readability": "^0.6.0",
         "jsdom": "^29.1.1",
         "p-map": "^7.0.4"

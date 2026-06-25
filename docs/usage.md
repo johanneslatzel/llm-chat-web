@@ -51,7 +51,7 @@ Search the web using DuckDuckGo, Tavily, or ExaAI. Accepts one or more queries â
 
 Each query produces its own result:
 
-```
+```text
 Search results for "query":
 
 [1] Title
@@ -122,7 +122,7 @@ Fetch one or more URLs in parallel and return their content as clean text. Each 
 
 Each URL produces its own result:
 
-```
+```text
 Page Title
 
 Extracted text content...

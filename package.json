@@ -66,12 +66,12 @@
     "dependencies": {
         "@johannes.latzel/llm-chat": "^0.7.0",
         "@mozilla/readability": "^0.6.0",
-        "jsdom": "^29.1.1",
+        "jsdom": "^30.0.1",
         "p-map": "^7.0.4"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@types/jsdom": "^28.0.3",
+        "@types/jsdom": "^30.0.0",
         "@types/node": "^26.2.0",
         "@typescript-eslint/eslint-plugin": "^8.60.1",
         "@typescript-eslint/parser": "^8.60.1",

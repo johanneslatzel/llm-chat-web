@@ -27,7 +27,7 @@ const pkg = new WebToolsPackage(
 suite.add(pkg);
 ```
 
-You can also override individual configs while leaving others at defaults by omitting the argument:
+Individual configs can be overridden while others stay at defaults by omitting the argument:
 
 ```typescript
 const pkg = new WebToolsPackage(
@@ -37,7 +37,7 @@ const pkg = new WebToolsPackage(
 
 ## WebSearchTool (tool name: `web_search`)
 
-Search the web using DuckDuckGo, Tavily, or ExaAI. Accepts one or more queries — each query returns its own independent result in the chain.
+Search the web using DuckDuckGo, Tavily, or ExaAI. Accepts one or more queries; each query returns its own independent result in the chain.
 
 ### Parameters
 
@@ -155,7 +155,7 @@ const result = await tool.execute({ urls: ['https://example.com'], max_chars: 50
 
 ### Content-type handling
 
-The tool dispatches the response content type to a registered handler from `FetchRegistry`:
+The tool dispatches the response content type to a registered handler from the `ContentHandlerRegistry`:
 
 | Content type | Handling |
 |---|---|
@@ -171,9 +171,14 @@ The tool dispatches the response content type to a registered handler from `Fetc
 See [architecture](architecture.md#content-type-handler-dispatch) for the dispatch mechanism. To supply custom handlers that take priority over the built-in defaults:
 
 ```typescript
-import { WebFetchTool, WebFetchConfiguration, FetchRegistry, ResultStatus } from '@johannes.latzel/llm-chat-web';
+import { ResultStatus } from '@johannes.latzel/llm-chat';
+import {
+    WebFetchTool,
+    WebFetchConfiguration,
+    ContentHandlerRegistry
+} from '@johannes.latzel/llm-chat-web';
 
-const registry = new FetchRegistry();
+const registry = new ContentHandlerRegistry();
 registry.register({
     name: 'my-handler',
     match: (ct) => ct.startsWith('text/html'),
@@ -181,8 +186,7 @@ registry.register({
         return { result: body, status: ResultStatus.Success };
     }
 });
-// Built-in defaults are NOT added since a handler is already registered.
-// Call registry.init() to append defaults after your custom handler.
+// Registering a custom handler replaces the built-in defaults entirely.
 
 const tool = new WebFetchTool(new WebFetchConfiguration(), registry);
 ```
@@ -197,7 +201,7 @@ See [architecture](architecture.md#content-extraction) for the full HTML extract
 
 ### Truncation
 
-When content exceeds `max_chars`, the tool truncates at the nearest boundary — paragraph break, sentence break, word break, or hard character cut. A `... [truncated]` marker is appended. See [architecture](architecture.md#truncation) for the detailed algorithm.
+When content exceeds `max_chars`, the tool truncates at the nearest boundary: paragraph break, sentence break, word break, or hard character cut. A `[truncated]` marker is appended. See [architecture](architecture.md#truncation) for the detailed algorithm.
 
 ### Content-size guard
 
@@ -205,7 +209,7 @@ Before downloading, the tool sends a `HEAD` request to check `Content-Length`. I
 
 ## Error Handling
 
-Tools never throw — errors are returned in the result:
+Tools never throw; errors are returned in the result:
 
 ```typescript
 const result = await tool.execute({ queries: ['something'] });

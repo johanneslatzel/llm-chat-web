@@ -3,3 +3,4 @@ coverage/
 site/
 .env
 dist/
+*.tgz

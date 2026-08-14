@@ -11,7 +11,7 @@
 [![Socket Badge](https://badge.socket.dev/npm/package/@johannes.latzel/llm-chat-web/latest)](https://badge.socket.dev/npm/package/@johannes.latzel/llm-chat-web/latest)
 [![AI Assisted Yes](https://img.shields.io/badge/AI%20Assisted-Yes-green)](https://github.com/mefengl/made-by-ai)
 
-Web tool suite for the `llm-chat` ecosystem — equips LLM agents with web search and URL fetching capabilities, with intelligent content extraction.
+Web tool suite for the `llm-chat` ecosystem. Equips LLM agents with web search and URL fetching capabilities with intelligent content extraction.
 
 ## Features
 
@@ -23,7 +23,7 @@ Web tool suite for the `llm-chat` ecosystem — equips LLM agents with web searc
 
 ## Prerequisites
 
-- Node.js >= 18
+- Node.js >= 20.19
 
 ## Installation
 
@@ -37,7 +37,7 @@ Full documentation at **[johanneslatzel.github.io/llm-chat-web/](https://johanne
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT. See [`LICENSE`](LICENSE).
 
 ## Contributing
 

@@ -1,12 +1,14 @@
 # Overview
 
-A typed TypeScript package providing web search and URL fetching tools for the `llm-chat` ecosystem.
+Typed web search and URL fetching tools for the `@johannes.latzel/llm-chat` ecosystem. `WebSearchTool` queries DuckDuckGo, Tavily, or ExaAI; `WebFetchTool` fetches URLs and returns clean, extracted text.
 
-- **[Architecture](architecture.md)** — source structure, design, and types
-- **[Configuration](configuration.md)** — environment variables and config class
-- **[Usage](usage.md)** — tool parameters, examples, and registration
-- **[Quick Start](quickstart.md)** — getting started guide
+## Navigation
+
+- [Architecture](architecture.md): source structure, design, and types
+- [Environment Variables](configuration.md): config classes and env vars
+- [Quick Start](quickstart.md): getting started guide
+- [Usage](usage.md): tool parameters, examples, and registration
 
 ## License
 
-MIT — see [`LICENSE`](https://github.com/johanneslatzel/llm-chat-web/blob/main/LICENSE).
+MIT. See [`LICENSE`](https://github.com/johanneslatzel/llm-chat-web/blob/main/LICENSE).

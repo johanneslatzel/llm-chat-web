@@ -1,8 +1,9 @@
 {
     "name": "@johannes.latzel/llm-chat-web",
-    "version": "0.3.1",
+    "version": "0.4.0",
     "description": "Web tool suite for the llm-chat ecosystem",
     "license": "MIT",
+    "sideEffects": false,
     "files": [
         "dist/",
         "README.md",
@@ -26,7 +27,7 @@
         "tool"
     ],
     "engines": {
-        "node": ">=18"
+        "node": ">=20.19.0"
     },
     "publishConfig": {
         "access": "public"
@@ -41,6 +42,8 @@
         }
     },
     "scripts": {
+        "prebuild": "rm -rf dist/",
+        "prepack": "npm run build",
         "build": "tsc -p tsconfig.build.json",
         "docs": "docker run --rm -it -p 8000:8000 -v $PWD:/docs squidfunk/mkdocs-material",
         "lint": "eslint . --max-warnings 0",
@@ -50,7 +53,8 @@
         "test:coverage": "vitest run --coverage",
         "clean:pack": "rm -rf node_modules dist/ package-lock.json && npm cache clean --force && npm install && npm run verify && npm run build && npm pack",
         "clean:install": "rm -rf node_modules dist/ package-lock.json && npm cache clean --force && npm install && npm run verify",
-        "prepare": "husky"
+        "prepare": "husky",
+        "audit": "npm audit --audit-level=high"
     },
     "lint-staged": {
         "src/**/*.ts": [
@@ -60,23 +64,23 @@
         ]
     },
     "dependencies": {
-        "@johannes.latzel/llm-chat": "^0.6.0",
+        "@johannes.latzel/llm-chat": "^0.7.0",
         "@mozilla/readability": "^0.6.0",
         "jsdom": "^29.1.1",
         "p-map": "^7.0.4"
     },
     "devDependencies": {
-        "@eslint/js": "^9.24.0",
+        "@eslint/js": "^10.0.1",
         "@types/jsdom": "^28.0.3",
-        "@types/node": "^22.19.19",
+        "@types/node": "^26.2.0",
         "@typescript-eslint/eslint-plugin": "^8.60.1",
         "@typescript-eslint/parser": "^8.60.1",
         "@vitest/coverage-v8": "^4.1.8",
-        "eslint": "^9.39.4",
+        "eslint": "^10.8.1",
         "eslint-config-prettier": "^10.1.8",
-        "eslint-plugin-n": "^17.24.0",
+        "eslint-plugin-n": "^18.3.0",
         "husky": "^9.1.7",
-        "lint-staged": "^15.5.2",
+        "lint-staged": "^17.3.0",
         "prettier": "^3.8.3",
         "typescript": "^6.0.3",
         "vitest": "^4.1.8"

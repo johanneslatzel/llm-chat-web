@@ -3,7 +3,9 @@ import {
     WebSearchConfiguration,
     WebSearchProvider,
     WebSearchTool,
+    ProviderStrategy
 } from '../../src/index.js';
+import type { ProviderEntry } from '../../src/index.js';
 import { ResultStatus } from '@johannes.latzel/llm-chat';
 import { mockFetch, mockFetchSequence, restoreFetch } from '../index.js';
 
@@ -23,7 +25,7 @@ describe('WebSearchTool', () => {
     let cfg: WebSearchConfiguration;
 
     beforeEach(() => {
-        cfg = new WebSearchConfiguration(WebSearchProvider.Tavily, 'test-key');
+        cfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Tavily, apiKey: 'test-key' }]);
         mockPMap.mockImplementation(
             async <T>(items: readonly (() => T)[], _mapper: (item: () => T) => T, _options: unknown): Promise<T[]> => {
                 const results: T[] = [];
@@ -75,7 +77,7 @@ describe('WebSearchTool', () => {
     });
 
     it('uses DuckDuckGo provider', async () => {
-        const ddgCfg = new WebSearchConfiguration(WebSearchProvider.DuckDuckGo);
+        const ddgCfg = new WebSearchConfiguration();
         const ddgHtml = `<html><a rel="nofollow" class="result__a" href="https://example.com">Title</a><a class="result__snippet">Snippet text</a></html>`;
         mockFetch({ ok: true, status: 200, statusText: 'OK', body: ddgHtml });
         const tool = new WebSearchTool(ddgCfg);
@@ -85,7 +87,7 @@ describe('WebSearchTool', () => {
     });
 
     it('handles DuckDuckGo redirect URLs', async () => {
-        const ddgCfg = new WebSearchConfiguration(WebSearchProvider.DuckDuckGo);
+        const ddgCfg = new WebSearchConfiguration();
         const encodedUrl = encodeURIComponent('https://real-example.com/page');
         const ddgHtml = `<html><a rel="nofollow" class="result__a" href="https://duckduckgo.com/l/?uddg=${encodedUrl}&amp;rut=abc">Result</a><a class="result__snippet">Description</a></html>`;
         mockFetch({ ok: true, status: 200, statusText: 'OK', body: ddgHtml });
@@ -104,7 +106,7 @@ describe('WebSearchTool', () => {
     });
 
     it('handles DuckDuckGo HTTP errors', async () => {
-        const ddgCfg = new WebSearchConfiguration(WebSearchProvider.DuckDuckGo);
+        const ddgCfg = new WebSearchConfiguration();
         mockFetch({ ok: false, status: 503, statusText: 'Service Unavailable', body: '', headers: { 'content-type': 'text/html' } });
         const tool = new WebSearchTool(ddgCfg);
         const result = await tool.execute({ queries: ['test'] });
@@ -132,7 +134,7 @@ describe('WebSearchTool', () => {
     });
 
     it('uses ExaAI provider', async () => {
-        const exaCfg = new WebSearchConfiguration(WebSearchProvider.ExaAI, 'exa-key');
+        const exaCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.ExaAI, apiKey: 'exa-key' }]);
         mockFetch(makeSearchResponse([
             { title: 'Exa Result', url: 'https://exa.example.com', content: 'Exa content' }
         ]));
@@ -143,7 +145,7 @@ describe('WebSearchTool', () => {
     });
 
     it('handles ExaAI API errors', async () => {
-        const exaCfg = new WebSearchConfiguration(WebSearchProvider.ExaAI, 'bad-key');
+        const exaCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.ExaAI, apiKey: 'bad-key' }]);
         mockFetch({ ok: false, status: 403, statusText: 'Forbidden', body: 'Forbidden' });
         const tool = new WebSearchTool(exaCfg);
         const result = await tool.execute({ queries: ['test'] });
@@ -152,15 +154,18 @@ describe('WebSearchTool', () => {
     });
 
     it('reports error for unknown provider', async () => {
-        (cfg as any).provider = 'made-up';
-        const tool = new WebSearchTool(cfg);
+        const badCfg = new WebSearchConfiguration(
+            [{ provider: 'made-up' as WebSearchProvider }],
+            ProviderStrategy.Single
+        );
+        const tool = new WebSearchTool(badCfg);
         const result = await tool.execute({ queries: ['test'] });
         expect(result[0]!.status).toBe(ResultStatus.Error);
         expect(result[0]!.result).toContain('Unknown');
     });
 
     it('handles Tavily timeout', async () => {
-        const timeoutCfg = new WebSearchConfiguration(WebSearchProvider.Tavily, 'test-key');
+        const timeoutCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Tavily, apiKey: 'test-key' }]);
         (timeoutCfg as any).searchTimeoutMs = 100;
         vi.spyOn(globalThis, 'fetch').mockRejectedValue(
             new DOMException('The operation timed out', 'TimeoutError')
@@ -171,7 +176,7 @@ describe('WebSearchTool', () => {
     });
 
     it('handles DuckDuckGo timeout', async () => {
-        const ddgCfg = new WebSearchConfiguration(WebSearchProvider.DuckDuckGo);
+        const ddgCfg = new WebSearchConfiguration();
         (ddgCfg as any).searchTimeoutMs = 100;
         vi.spyOn(globalThis, 'fetch').mockRejectedValue(
             new DOMException('The operation timed out', 'TimeoutError')
@@ -182,7 +187,7 @@ describe('WebSearchTool', () => {
     });
 
     it('handles ExaAI timeout', async () => {
-        const exaCfg = new WebSearchConfiguration(WebSearchProvider.ExaAI, 'key');
+        const exaCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.ExaAI, apiKey: 'key' }]);
         (exaCfg as any).searchTimeoutMs = 100;
         vi.spyOn(globalThis, 'fetch').mockRejectedValue(
             new DOMException('The operation timed out', 'TimeoutError')
@@ -250,5 +255,223 @@ describe('WebSearchTool', () => {
         expect(result).toHaveLength(2);
         expect(result[0]!.status).toBe(ResultStatus.Success);
         expect(result[1]!.status).toBe(ResultStatus.Error);
+    });
+
+    it('detects DuckDuckGo anti-bot challenge page and returns error', async () => {
+        const ddgCfg = new WebSearchConfiguration();
+        const challengeHtml = `<html><body>Unfortunately, bots use DuckDuckGo too. Please complete the following challenge to confirm this search was made by a human. Select all squares containing a duck:</body></html>`;
+        mockFetch({ ok: true, status: 200, statusText: 'OK', body: challengeHtml });
+        const tool = new WebSearchTool(ddgCfg);
+        const result = await tool.execute({ queries: ['test challenge'] });
+        expect(result[0]!.status).toBe(ResultStatus.Error);
+        expect(result[0]!.result).toContain('anti-bot challenge');
+    });
+
+    it('retries on DuckDuckGo 403 and succeeds on second attempt', async () => {
+        const ddgCfg = new WebSearchConfiguration();
+        const normalHtml = `<html><a rel="nofollow" class="result__a" href="https://example.com">Retry Result</a><a class="result__snippet">Snippet</a></html>`;
+        mockFetchSequence([
+            { ok: false, status: 403, statusText: 'Forbidden', body: 'Forbidden' },
+            { ok: true, status: 200, statusText: 'OK', body: normalHtml }
+        ]);
+        const tool = new WebSearchTool(ddgCfg);
+        const result = await tool.execute({ queries: ['test retry'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('Retry Result');
+    });
+
+    it('retries on DuckDuckGo 429 and succeeds on second attempt', async () => {
+        const ddgCfg = new WebSearchConfiguration();
+        const normalHtml = `<html><a rel="nofollow" class="result__a" href="https://example.com">Rate Limit Retry</a><a class="result__snippet">Snippet</a></html>`;
+        mockFetchSequence([
+            { ok: false, status: 429, statusText: 'Too Many Requests', body: 'Rate limited' },
+            { ok: true, status: 200, statusText: 'OK', body: normalHtml }
+        ]);
+        const tool = new WebSearchTool(ddgCfg);
+        const result = await tool.execute({ queries: ['test rate limit'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('Rate Limit Retry');
+    });
+
+    it('retries on DuckDuckGo challenge page and succeeds on second attempt', async () => {
+        const ddgCfg = new WebSearchConfiguration();
+        const challengeHtml = `<html><body>Unfortunately, bots use DuckDuckGo too. Please complete the following challenge to confirm this search was made by a human.</body></html>`;
+        const normalHtml = `<html><a rel="nofollow" class="result__a" href="https://example.com">Challenge Retry Result</a><a class="result__snippet">Snippet</a></html>`;
+        mockFetchSequence([
+            { ok: true, status: 200, statusText: 'OK', body: challengeHtml },
+            { ok: true, status: 200, statusText: 'OK', body: normalHtml }
+        ]);
+        const tool = new WebSearchTool(ddgCfg);
+        const result = await tool.execute({ queries: ['test challenge retry'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('Challenge Retry Result');
+    });
+
+    it('reports error after max retries on DuckDuckGo challenge pages', async () => {
+        const ddgCfg = new WebSearchConfiguration();
+        const challengeHtml = `<html><body>Unfortunately, bots use DuckDuckGo too. Please complete the following challenge.</body></html>`;
+        mockFetchSequence([
+            { ok: true, status: 200, statusText: 'OK', body: challengeHtml },
+            { ok: true, status: 200, statusText: 'OK', body: challengeHtml },
+            { ok: true, status: 200, statusText: 'OK', body: challengeHtml }
+        ]);
+        const tool = new WebSearchTool(ddgCfg);
+        const result = await tool.execute({ queries: ['test max retries'] });
+        expect(result[0]!.status).toBe(ResultStatus.Error);
+        expect(result[0]!.result).toContain('anti-bot challenge');
+    });
+
+    it('reports error after max retries on DuckDuckGo 403 responses', async () => {
+        const ddgCfg = new WebSearchConfiguration();
+        mockFetchSequence([
+            { ok: false, status: 403, statusText: 'Forbidden', body: 'Forbidden' },
+            { ok: false, status: 403, statusText: 'Forbidden', body: 'Forbidden' },
+            { ok: false, status: 403, statusText: 'Forbidden', body: 'Forbidden' }
+        ]);
+        const tool = new WebSearchTool(ddgCfg);
+        const result = await tool.execute({ queries: ['test max retries 403'] });
+        expect(result[0]!.status).toBe(ResultStatus.Error);
+        expect(result[0]!.result).toContain('DuckDuckGo HTTP error (403)');
+    });
+
+    it('does not false-positive on normal DuckDuckGo pages with "challenge" in snippets', async () => {
+        const ddgCfg = new WebSearchConfiguration();
+        const normalHtml = `<html><a rel="nofollow" class="result__a" href="https://example.com">Challenge Accepted</a><a class="result__snippet">This article discusses how to overcome challenges in life.</a></html>`;
+        mockFetch({ ok: true, status: 200, statusText: 'OK', body: normalHtml });
+        const tool = new WebSearchTool(ddgCfg);
+        const result = await tool.execute({ queries: ['test no false positive'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('Challenge Accepted');
+    });
+
+    it('uses Firecrawl provider', async () => {
+        const fcCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Firecrawl, apiKey: 'fc-key' }]);
+        const fcResponse = {
+            ok: true, status: 200, statusText: 'OK',
+            body: JSON.stringify({
+                success: true,
+                data: {
+                    web: [{ title: 'Fire Result', url: 'https://fire.example.com', description: 'Fire content' }]
+                }
+            })
+        };
+        mockFetch(fcResponse);
+        const tool = new WebSearchTool(fcCfg);
+        const result = await tool.execute({ queries: ['fire test'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('Fire Result');
+    });
+
+    it('handles Firecrawl API errors', async () => {
+        const fcCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Firecrawl, apiKey: 'bad-key' }]);
+        mockFetch({ ok: false, status: 401, statusText: 'Unauthorized', body: 'Invalid API key' });
+        const tool = new WebSearchTool(fcCfg);
+        const result = await tool.execute({ queries: ['test'] });
+        expect(result[0]!.status).toBe(ResultStatus.Error);
+        expect(result[0]!.result).toContain('Firecrawl');
+    });
+
+    it('handles Firecrawl timeout', async () => {
+        const fcCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Firecrawl, apiKey: 'key' }]);
+        (fcCfg as any).searchTimeoutMs = 100;
+        vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+            new DOMException('The operation timed out', 'TimeoutError')
+        );
+        const tool = new WebSearchTool(fcCfg);
+        const result = await tool.execute({ queries: ['timeout'] });
+        expect(result[0]!.status).toBe(ResultStatus.Error);
+    });
+
+    it('handles Firecrawl empty results', async () => {
+        const fcCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Firecrawl, apiKey: 'fc-key' }]);
+        const fcResponse = {
+            ok: true, status: 200, statusText: 'OK',
+            body: JSON.stringify({
+                success: true,
+                data: { web: [] }
+            })
+        };
+        mockFetch(fcResponse);
+        const tool = new WebSearchTool(fcCfg);
+        const result = await tool.execute({ queries: ['empty'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('No search results');
+    });
+
+    it('handles Firecrawl missing data.web gracefully', async () => {
+        const fcCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Firecrawl, apiKey: 'fc-key' }]);
+        const fcResponse = {
+            ok: true, status: 200, statusText: 'OK',
+            body: JSON.stringify({
+                success: true,
+                data: {}
+            })
+        };
+        mockFetch(fcResponse);
+        const tool = new WebSearchTool(fcCfg);
+        const result = await tool.execute({ queries: ['missing'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('No search results');
+    });
+
+    it('handles Firecrawl missing data property entirely', async () => {
+        const fcCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Firecrawl, apiKey: 'fc-key' }]);
+        const fcResponse = {
+            ok: true, status: 200, statusText: 'OK',
+            body: JSON.stringify({
+                success: true
+            })
+        };
+        mockFetch(fcResponse);
+        const tool = new WebSearchTool(fcCfg);
+        const result = await tool.execute({ queries: ['no-data'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('No search results');
+    });
+
+    it('handles Firecrawl empty description gracefully', async () => {
+        const fcCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Firecrawl, apiKey: 'fc-key' }]);
+        const fcResponse = {
+            ok: true, status: 200, statusText: 'OK',
+            body: JSON.stringify({
+                success: true,
+                data: {
+                    web: [{ title: 'No Desc', url: 'https://example.com', description: '' }]
+                }
+            })
+        };
+        mockFetch(fcResponse);
+        const tool = new WebSearchTool(fcCfg);
+        const result = await tool.execute({ queries: ['empty desc'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('No Desc');
+    });
+
+    it('handles Firecrawl data.web explicitly null', async () => {
+        const fcCfg = new WebSearchConfiguration([{ provider: WebSearchProvider.Firecrawl, apiKey: 'fc-key' }]);
+        const fcResponse = {
+            ok: true, status: 200, statusText: 'OK',
+            body: JSON.stringify({
+                success: true,
+                data: { web: null }
+            })
+        };
+        mockFetch(fcResponse);
+        const tool = new WebSearchTool(fcCfg);
+        const result = await tool.execute({ queries: ['null-web'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('No search results');
+    });
+
+    it('runs parallel strategy across multiple providers end-to-end', async () => {
+        const entries: ProviderEntry[] = [
+            { provider: WebSearchProvider.Tavily, apiKey: 'tv-key' },
+            { provider: WebSearchProvider.ExaAI, apiKey: 'ex-key' }
+        ];
+        const cfg = new WebSearchConfiguration(entries, ProviderStrategy.Parallel);
+        mockFetch(makeSearchResponse([{ title: 'A', url: 'https://a.com', content: 'ca' }]));
+        const result = await new WebSearchTool(cfg).execute({ queries: ['q'] });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('https://a.com');
     });
 });

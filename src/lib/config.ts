@@ -1,4 +1,5 @@
-import { WebSearchProvider } from './types.js';
+import { ProviderStrategy, WebSearchProvider } from './types.js';
+import type { ProviderEntry } from './types.js';
 import { envInt, envString, envEnum } from './env.js';
 
 const MAX_CHARS_PER_FETCH_DEFAULT = 10_000;
@@ -17,24 +18,18 @@ const CONCURRENCY_DEFAULT = 3;
  * Each property can be set at construction time or overridden via environment
  * variables (see individual field docs for the env-var name).
  *
- * @property apiKey           API key for paid search providers (Tavily, ExaAI).
- *                             Falls back to `LLM_CHAT_WEB_SEARCH_API_KEY`.
- * @property provider         Which search backend to use.
- *                             Falls back to `LLM_CHAT_WEB_SEARCH_PROVIDER`.
+ * @property providers        Multi-provider entries describing the active backends.
+ *                             Taken from constructor args or resolved from
+ *                             `LLM_CHAT_WEB_SEARCH_PROVIDERS`. Zero-config resolves
+ *                             to a single keyless DuckDuckGo entry.
+ * @property strategy         How multiple providers are combined
+ *                             (env: `LLM_CHAT_WEB_SEARCH_PROVIDER_STRATEGY`, default: single).
  * @property maxResults       Max results returned per query (env: `LLM_CHAT_WEB_SEARCH_MAX_RESULTS`).
  * @property maxCharsPerResult Max characters per result snippet (env: `LLM_CHAT_WEB_SEARCH_MAX_CHARS_PER_RESULT`).
  * @property searchTimeoutMs  Timeout per search-API call in ms (env: `LLM_CHAT_WEB_SEARCH_TIMEOUT_MS`).
  * @property concurrency      Max concurrent search queries (env: `LLM_CHAT_WEB_SEARCH_CONCURRENCY`).
  */
 export class WebSearchConfiguration {
-    /** API key for paid search providers (Tavily, ExaAI). Falls back to `LLM_CHAT_WEB_SEARCH_API_KEY`. */
-    apiKey: string = envString('LLM_CHAT_WEB_SEARCH_API_KEY', '');
-    /** Which search backend to use. Falls back to `LLM_CHAT_WEB_SEARCH_PROVIDER`. */
-    provider: WebSearchProvider = envEnum(
-        'LLM_CHAT_WEB_SEARCH_PROVIDER',
-        Object.values(WebSearchProvider) as WebSearchProvider[],
-        WebSearchProvider.DuckDuckGo
-    );
     /** Max results returned per query (env: `LLM_CHAT_WEB_SEARCH_MAX_RESULTS`). */
     maxResults: number = envInt('LLM_CHAT_WEB_SEARCH_MAX_RESULTS', 5);
     /** Max characters per result snippet (env: `LLM_CHAT_WEB_SEARCH_MAX_CHARS_PER_RESULT`). */
@@ -43,16 +38,92 @@ export class WebSearchConfiguration {
     searchTimeoutMs: number = envInt('LLM_CHAT_WEB_SEARCH_TIMEOUT_MS', SEARCH_TIMEOUT_DEFAULT_MS);
     /** Max concurrent search queries (env: `LLM_CHAT_WEB_SEARCH_CONCURRENCY`). */
     concurrency: number = envInt('LLM_CHAT_WEB_SEARCH_CONCURRENCY', CONCURRENCY_DEFAULT);
+    /** How multiple configured providers are combined (env: `LLM_CHAT_WEB_SEARCH_PROVIDER_STRATEGY`). */
+    strategy: ProviderStrategy = envEnum(
+        'LLM_CHAT_WEB_SEARCH_PROVIDER_STRATEGY',
+        Object.values(ProviderStrategy) as ProviderStrategy[],
+        ProviderStrategy.Single
+    );
+    /** Provider entries describing the active search backends. Always non-empty after construction. */
+    providers: ProviderEntry[] = [];
 
     /**
-     * @param provider Search provider to use. If omitted, resolved from
-     *                 `LLM_CHAT_WEB_SEARCH_PROVIDER` env var (default: DuckDuckGo).
-     * @param apiKey   API key for paid providers. If omitted, falls back to
-     *                 `LLM_CHAT_WEB_SEARCH_API_KEY` env var.
+     * Creates a web search configuration.
+     *
+     * @param providers Provider entries to combine. When omitted or empty, entries are
+     *                  resolved from `LLM_CHAT_WEB_SEARCH_PROVIDERS`; unknown names are
+     *                  skipped, and when nothing valid remains a single keyless
+     *                  DuckDuckGo entry keeps zero-config setups working.
+     * @param strategy  Strategy used to combine the providers. If omitted,
+     *                  resolved from `LLM_CHAT_WEB_SEARCH_PROVIDER_STRATEGY` (default: single).
      */
-    constructor(provider?: WebSearchProvider, apiKey?: string) {
-        if (apiKey !== undefined) this.apiKey = apiKey;
-        if (provider !== undefined) this.provider = provider;
+    constructor(providers?: ProviderEntry[], strategy?: ProviderStrategy) {
+        this.providers =
+            providers !== undefined && providers.length > 0
+                ? [...providers]
+                : this.resolveProvidersFromEnv();
+        if (strategy !== undefined) {
+            this.strategy = strategy;
+        }
+    }
+
+    /**
+     * Builds the provider entries from `LLM_CHAT_WEB_SEARCH_PROVIDERS`.
+     * Each name maps to a `ProviderEntry`; its API key comes from the backend's
+     * dedicated env var. Unknown names are skipped. Falls back to a single
+     * keyless DuckDuckGo entry when no valid name remains.
+     */
+    private resolveProvidersFromEnv(): ProviderEntry[] {
+        const raw = process.env['LLM_CHAT_WEB_SEARCH_PROVIDERS'];
+        const names =
+            raw === undefined
+                ? []
+                : raw
+                      .split(',')
+                      .map((name) => name.trim())
+                      .filter((name) => name !== '');
+        const entries: ProviderEntry[] = [];
+        for (const name of names) {
+            const entry = this.entryForName(name);
+            if (entry !== undefined) entries.push(entry);
+        }
+        return entries.length === 0 ? [{ provider: WebSearchProvider.DuckDuckGo }] : entries;
+    }
+
+    /** Builds a ProviderEntry, omitting the apiKey property when absent. */
+    private makeEntry(provider: WebSearchProvider, apiKey?: string): ProviderEntry {
+        return apiKey === undefined || apiKey === '' ? { provider } : { provider, apiKey };
+    }
+
+    /**
+     * Maps a provider name from `LLM_CHAT_WEB_SEARCH_PROVIDERS` to an entry.
+     * Returns undefined for unknown names so invalid entries are skipped
+     * instead of being silently mapped to another backend.
+     */
+    private entryForName(name: string): ProviderEntry | undefined {
+        const provider = Object.values(WebSearchProvider).find((candidate) => candidate === name);
+        if (provider === undefined) return undefined;
+        return this.makeEntry(provider, this.resolveApiKey(provider));
+    }
+
+    /** Per-provider API key from its dedicated env var, or undefined when unset. */
+    private resolveApiKey(provider: WebSearchProvider): string | undefined {
+        let key: string;
+        switch (provider) {
+            case WebSearchProvider.Tavily:
+                key = envString('LLM_CHAT_WEB_SEARCH_TAVILY_API_KEY', '');
+                break;
+            case WebSearchProvider.ExaAI:
+                key = envString('LLM_CHAT_WEB_SEARCH_EXAAI_API_KEY', '');
+                break;
+            case WebSearchProvider.Firecrawl:
+                key = envString('LLM_CHAT_WEB_SEARCH_FIRECRAWL_API_KEY', '');
+                break;
+            case WebSearchProvider.DuckDuckGo:
+                key = '';
+                break;
+        }
+        return key || undefined;
     }
 }
 

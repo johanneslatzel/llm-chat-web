@@ -1,6 +1,6 @@
 # Overview
 
-Typed web search and URL fetching tools for the `@johannes.latzel/llm-chat` ecosystem. `WebSearchTool` queries DuckDuckGo, Tavily, or ExaAI; `WebFetchTool` fetches URLs and returns clean, extracted text.
+Typed web search and URL fetching tools for the `@johannes.latzel/llm-chat` ecosystem. `WebSearchTool` queries DuckDuckGo, Tavily, ExaAI, or Firecrawl; `WebFetchTool` fetches URLs and returns clean, extracted text.
 
 ## Navigation
 

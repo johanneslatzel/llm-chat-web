@@ -37,7 +37,7 @@ const pkg = new WebToolsPackage(
 
 ## WebSearchTool (tool name: `web_search`)
 
-Search the web using DuckDuckGo, Tavily, or ExaAI. Accepts one or more queries; each query returns its own independent result in the chain.
+Search the web using DuckDuckGo, Tavily, ExaAI, or Firecrawl. Accepts one or more queries; each query returns its own independent result in the chain.
 
 ### Parameters
 
@@ -97,15 +97,19 @@ const exaTool = new WebSearchTool(exaConfig);
 
 const ddgConfig = new WebSearchConfiguration(WebSearchProvider.DuckDuckGo);
 const ddgTool = new WebSearchTool(ddgConfig);
+
+const fcConfig = new WebSearchConfiguration(WebSearchProvider.Firecrawl, 'your-firecrawl-key');
+const fcTool = new WebSearchTool(fcConfig);
 ```
 
 ### Provider notes
 
-| Provider | API Key | Rate Limits |
-|---|---|---|
-| **DuckDuckGo** | Not needed | None (HTML scraping) |
-| **Tavily** | Required | Varies by plan |
-| **ExaAI** | Required | Varies by plan |
+| Provider | API Key | Rate Limits | Notes |
+|---|---|---|---|
+| **DuckDuckGo** | Not needed | None (HTML scraping) | Subject to anti-bot challenge pages; retries with backoff (max 2) and concurrency capped at 1 |
+| **Tavily** | Required | Varies by plan | |
+| **ExaAI** | Required | Varies by plan | |
+| **Firecrawl** | Required (prefix: `fc-`) | Varies by plan | Search via `/v2/search` endpoint |
 
 ## WebFetchTool (tool name: `web_fetch`)
 

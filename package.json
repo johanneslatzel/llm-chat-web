@@ -1,6 +1,6 @@
 {
     "name": "@johannes.latzel/llm-chat-web",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Web tool suite for the llm-chat ecosystem",
     "license": "MIT",
     "sideEffects": false,
@@ -48,7 +48,8 @@
         "docs": "docker run --rm -it -p 8000:8000 -v $PWD:/docs squidfunk/mkdocs-material",
         "lint": "eslint . --max-warnings 0",
         "format": "prettier --write src",
-        "verify": "tsc --noEmit && eslint . --max-warnings 0 && vitest run --coverage",
+        "check:lines": "check-line-limits",
+        "verify": "tsc --noEmit && eslint . --max-warnings 0 && npm run check:lines && vitest run --coverage",
         "test": "vitest",
         "test:coverage": "vitest run --coverage",
         "clean:pack": "rm -rf node_modules dist/ package-lock.json && npm cache clean --force && npm install && npm run verify && npm run build && npm pack",
@@ -75,14 +76,15 @@
         "@types/node": "^26.2.0",
         "@typescript-eslint/eslint-plugin": "^8.60.1",
         "@typescript-eslint/parser": "^8.60.1",
-        "@vitest/coverage-v8": "^4.1.8",
+        "@vitest/coverage-v8": "^4.1.11",
         "eslint": "^10.8.1",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-n": "^18.3.0",
         "husky": "^9.1.7",
         "lint-staged": "^17.3.0",
+        "@johannes.latzel/check-line-limits": "^1.0.1",
         "prettier": "^3.8.3",
         "typescript": "^6.0.3",
-        "vitest": "^4.1.8"
+        "vitest": "^4.1.11"
     }
 }

@@ -5,8 +5,8 @@
 [![version](https://img.shields.io/github/package-json/v/johanneslatzel/llm-chat-web)](https://github.com/johanneslatzel/llm-chat-web/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/johanneslatzel/llm-chat-web/pulls)
-[![codecov](https://codecov.io/gh/johanneslatzel/llm-chat-web/graph/badge.svg)](https://codecov.io/gh/johanneslatzel/llm-chat-web)
 [![Feedback Welcome](https://img.shields.io/badge/feedback-welcome-brightgreen)](https://github.com/johanneslatzel/llm-chat-web/discussions)
+[![codecov](https://codecov.io/gh/johanneslatzel/llm-chat-web/graph/badge.svg)](https://codecov.io/gh/johanneslatzel/llm-chat-web)
 [![CI](https://github.com/johanneslatzel/llm-chat-web/actions/workflows/ci.yml/badge.svg)](https://github.com/johanneslatzel/llm-chat-web/actions/workflows/ci.yml)
 [![Socket Badge](https://badge.socket.dev/npm/package/@johannes.latzel/llm-chat-web/latest)](https://badge.socket.dev/npm/package/@johannes.latzel/llm-chat-web/latest)
 [![AI Assisted Yes](https://img.shields.io/badge/AI%20Assisted-Yes-green)](https://github.com/mefengl/made-by-ai)
@@ -15,7 +15,7 @@ Web tool suite for the `llm-chat` ecosystem. Equips LLM agents with web search a
 
 ## Features
 
-- `web_search` tool: three search providers: DuckDuckGo (free, no API key), Tavily, and ExaAI
+- `web_search` tool: four search providers (DuckDuckGo free and keyless, Tavily, ExaAI, Firecrawl) combinable via multi-provider strategies (single, parallel, fallback, weighted_random, round_robin)
 - `web_fetch` tool: intelligent URL fetching with Mozilla Readability extraction, CSS-selector fallback, and built-in content-type handlers for HTML, JSON, XML, CSV, Markdown, and plain text
 - parallel execution of queries and fetches with configurable concurrency
 - Content-Length pre-check on URL fetches to reject oversized responses before downloading

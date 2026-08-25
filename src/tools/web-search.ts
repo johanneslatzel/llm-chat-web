@@ -1,9 +1,7 @@
 import { WebSearchConfiguration } from '../lib/config.js';
 import { WebSearchProvider } from '../lib/types.js';
 import { SearchProvider } from '../lib/search/base.js';
-import { DuckDuckGoProvider } from '../lib/search/duckduckgo.js';
-import { TavilyProvider } from '../lib/search/tavily.js';
-import { ExaAIProvider } from '../lib/search/exaai.js';
+import { resolveSearchProvider } from '../lib/search/strategy-resolver.js';
 import type { WebSearchResult } from '../lib/types.js';
 import {
     PropertyType,
@@ -15,26 +13,6 @@ import {
 } from '@johannes.latzel/llm-chat';
 import type { PartialToolResult } from '@johannes.latzel/llm-chat';
 import pMap from 'p-map';
-
-/**
- * Create the appropriate search provider based on configuration.
- *
- * @param config Search configuration (provider, API key, limits, etc.).
- * @returns An instance of the configured SearchProvider.
- */
-function createProvider(config: WebSearchConfiguration): SearchProvider {
-    const timeoutMs = config.searchTimeoutMs;
-    switch (config.provider) {
-        case WebSearchProvider.DuckDuckGo:
-            return new DuckDuckGoProvider(timeoutMs);
-        case WebSearchProvider.Tavily:
-            return new TavilyProvider(config.apiKey, timeoutMs);
-        case WebSearchProvider.ExaAI:
-            return new ExaAIProvider(config.apiKey, timeoutMs);
-        default:
-            throw new Error('Unknown web search provider: ' + config.provider);
-    }
-}
 
 /**
  * Format search results into a human-readable string.
@@ -58,7 +36,7 @@ export class WebSearchTool extends Tool {
     private readonly config: WebSearchConfiguration;
 
     /**
-     * @param config Search configuration (provider, API key, limits, etc.).
+     * @param config Search configuration (providers, strategy, limits, etc.).
      */
     constructor(config: WebSearchConfiguration) {
         super(
@@ -113,7 +91,7 @@ export class WebSearchTool extends Tool {
 
         let provider: SearchProvider;
         try {
-            provider = createProvider(this.config);
+            provider = resolveSearchProvider(this.config);
         } catch (e) {
             return {
                 result: (e as Error).message,
@@ -121,7 +99,11 @@ export class WebSearchTool extends Tool {
             };
         }
 
-        const concurrency = Math.max(1, this.config.concurrency);
+        // Cap concurrency at 1 when every configured backend is DuckDuckGo to reduce IP-level throttling.
+        const duckDuckGoOnly =
+            this.config.providers.length > 0 &&
+            this.config.providers.every((entry) => entry.provider === WebSearchProvider.DuckDuckGo);
+        const concurrency = duckDuckGoOnly ? 1 : Math.max(1, this.config.concurrency);
 
         const promises = rawQueries.map(
             (q) => () => this.searchSingleQuery(q, provider, maxResults, maxCharsPerResult)

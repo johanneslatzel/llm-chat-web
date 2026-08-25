@@ -2,7 +2,26 @@
 export enum WebSearchProvider {
     DuckDuckGo = 'duckduckgo',
     Tavily = 'tavily',
-    ExaAI = 'exaai'
+    ExaAI = 'exaai',
+    Firecrawl = 'firecrawl'
+}
+
+/**
+ * Strategy describing how multiple configured providers are combined into a
+ * single logical search.
+ *
+ * @property Single        Query one provider only.
+ * @property Parallel      Query all providers concurrently and merge results.
+ * @property Fallback      Try providers in order until one succeeds.
+ * @property WeightedRandom Pick one provider per query via weight distribution.
+ * @property RoundRobin    Cycle through providers across consecutive queries.
+ */
+export enum ProviderStrategy {
+    Single = 'single',
+    Parallel = 'parallel',
+    Fallback = 'fallback',
+    WeightedRandom = 'weighted_random',
+    RoundRobin = 'round_robin'
 }
 
 /**
@@ -18,6 +37,20 @@ export type WebSearchResult = {
     url: string;
     content: string;
     score?: number;
+};
+
+/**
+ * One entry of a multi-provider search configuration.
+ *
+ * @property provider Which search backend to use.
+ * @property apiKey   Optional per-provider API key (overrides the global key).
+ * @property weight   Optional selection weight used by weighted strategies.
+ *                      Consumers default this to 1 when omitted.
+ */
+export type ProviderEntry = {
+    provider: WebSearchProvider;
+    apiKey?: string;
+    weight?: number;
 };
 
 /**

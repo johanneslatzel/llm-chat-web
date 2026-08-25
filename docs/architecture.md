@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@johannes.latzel/llm-chat-web` extends the `llm-chat` framework with web search and URL fetching tools: three search providers (DuckDuckGo, Tavily, ExaAI), HTML content extraction via Mozilla Readability, configurable content-type dispatch, and size-limited fetches with concurrency control.
+`@johannes.latzel/llm-chat-web` extends the `llm-chat` framework with web search and URL fetching tools: four search providers (DuckDuckGo, Tavily, ExaAI, Firecrawl) that can be combined into a single logical provider via configurable multi-provider strategies, HTML content extraction via Mozilla Readability, configurable content-type dispatch, and size-limited fetches with concurrency control.
 
 
 ## Design
@@ -27,7 +27,7 @@ The package bundles `WebSearchTool` and `WebFetchTool` into a single `ToolPackag
 
 ### Search providers
 
-The search tool delegates to one of three providers, each implementing the abstract `SearchProvider` class:
+The search tool delegates to one or more configured providers, each implementing the abstract `SearchProvider` class:
 
 ```typescript
 abstract class SearchProvider {
@@ -38,17 +38,32 @@ abstract class SearchProvider {
 
 | Provider | Class | Auth | Method |
 |---|---|---|---|
-| DuckDuckGo | `DuckDuckGoProvider` | None | HTML scraping |
+| DuckDuckGo | `DuckDuckGoProvider` | None | HTML scraping (with anti-bot challenge detection and retry) |
 | Tavily | `TavilyProvider` | API key | REST API (POST, Bearer token) |
 | ExaAI | `ExaAIProvider` | API key | REST API (POST, Bearer token) |
+| Firecrawl | `FirecrawlProvider` | API key | REST API (POST, Bearer token) |
 
 Providers that require an API key extend `ApiKeySearchProvider`, which adds `Content-Type` and `Authorization` headers and provides a `postJson()` convenience method.
 
-Provider selection is a constructor-time decision. `WebSearchConfiguration` takes a `WebSearchProvider` enum value, and `WebSearchTool` constructs the corresponding provider internally. Search provider classes are not part of the public API.
+DuckDuckGo does not require an API key but is subject to anti-bot challenge pages. The provider detects challenge pages via structural markers (e.g. `challenge-form`, "bots use DuckDuckGo") and retries with exponential backoff (max 2 retries, base 500ms). HTTP 403 and 429 responses are also retried. Search concurrency is capped at 1 when every configured provider entry is DuckDuckGo, to reduce IP-level throttling.
+
+Provider selection happens at construction time. `WebSearchTool` builds its effective provider via `resolveSearchProvider(config)`: every configured `ProviderEntry` is mapped to a concrete provider instance (missing weights default to 1), and the instances are wrapped in a `CompositeSearchProvider` that applies the configured `ProviderStrategy`. Search provider classes are not part of the public API.
+
+#### Composite provider and strategies
+
+`CompositeSearchProvider` combines all configured providers under one of five strategies:
+
+- **Single**: delegates every query to the first configured provider.
+- **Parallel**: queries all providers concurrently via `Promise.allSettled`; merges results, deduplicates them by URL (first occurrence wins), and truncates to `maxResults`. Partial failures are tolerated: results from successful providers are kept. Throws only when every provider fails (the first rejection reason).
+- **Fallback**: tries providers sequentially in configuration order and returns the first successful result; throws the last provider's error when all fail.
+- **WeightedRandom**: picks one provider per query using cumulative weight distribution; entries without a `weight` count as 1.
+- **RoundRobin**: cycles through the providers across consecutive queries; the rotation index lives on the composite instance.
+
+Zero-config setups resolve a single keyless `duckduckgo` entry, so the composite always contains at least one provider.
 
 ### WebSearchTool specifics
 
-The tool constructs the right provider based on configuration and delegates each query independently. Timeouts and headers use the shared HTTP client.
+The tool builds its provider from the configuration once per execution (`resolveSearchProvider`) and delegates each query independently. Timeouts and headers use the shared HTTP client.
 
 ### WebFetchTool specifics
 

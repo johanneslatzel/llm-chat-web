@@ -11,12 +11,17 @@ export interface MockFetchResponse {
 function createResponse(response: MockFetchResponse) {
     const defaultHeaders: Record<string, string> = { 'content-type': 'text/plain' };
     const headers = new Headers({ ...defaultHeaders, ...response.headers });
+    const bytes = new TextEncoder().encode(response.body);
     return {
         ok: response.ok,
         status: response.status,
         statusText: response.statusText,
         text: () => Promise.resolve(response.body),
         json: () => Promise.resolve(JSON.parse(response.body)),
+        arrayBuffer: () =>
+            Promise.resolve(
+                bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+            ),
         headers,
         url: 'http://localhost'
     } as unknown as Response;

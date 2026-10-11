@@ -4,6 +4,7 @@ export { WebSearchTool } from './tools/web-search.js';
 export { WebFetchTool } from './tools/web-fetch.js';
 export { WebToolsPackage } from './tools/web-tools-package.js';
 export { FetchRegistry as ContentHandlerRegistry } from './lib/fetch-registry.js';
+export type { HeaderRule } from './lib/header-rules.js';
 export { HtmlHandler } from './lib/content-handlers/html-handler.js';
 export { JsonHandler } from './lib/content-handlers/json-handler.js';
 export { XmlHandler } from './lib/content-handlers/xml-handler.js';
@@ -11,7 +12,8 @@ export { CsvHandler } from './lib/content-handlers/csv-handler.js';
 export { MarkdownHandler } from './lib/content-handlers/markdown-handler.js';
 export { PlainTextHandler } from './lib/content-handlers/plain-text-handler.js';
 export { GenericTextHandler } from './lib/content-handlers/generic-text-handler.js';
-export type { ContentHandler } from './lib/content-handler.js';
+export { PdfHandler } from './lib/content-handlers/pdf-handler.js';
+export type { ContentHandler, HandleOptions } from './lib/content-handler.js';
 export type { WebSearchResult } from './lib/types.js';
 export type { WebFetchResult } from './lib/types.js';
 

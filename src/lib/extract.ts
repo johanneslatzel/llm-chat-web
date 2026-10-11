@@ -5,7 +5,7 @@
  * fallback for non-article pages and a final fallback to document.body.
  */
 
-import { JSDOM } from 'jsdom';
+import { JSDOM, VirtualConsole } from 'jsdom';
 import { Readability, isProbablyReaderable } from '@mozilla/readability';
 
 /**
@@ -54,7 +54,11 @@ const FALLBACK_SELECTORS = [
  * @param url   Source URL (used by JSDOM for relative URL resolution).
  */
 export function extractText(html: string, url?: string): ExtractedContent {
-    const dom = new JSDOM(html, { url });
+    // jsdom parses inline <style> content while building the DOM and reports
+    // unsupported CSS as a jsdomError on its virtual console. A scraping
+    // library must not write those diagnostics to the host console, so use a
+    // virtual console that forwards nothing.
+    const dom = new JSDOM(html, { url, virtualConsole: new VirtualConsole() });
     const document = dom.window.document;
 
     // Strip elements that bias Readability's scoring or add noise to output.

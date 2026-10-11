@@ -30,13 +30,20 @@ export async function fetchWithTimeout(url: string, options?: FetchOptions): Pro
 
 export async function getContentLength(
     url: string,
-    options?: { timeout?: number }
+    options?: FetchOptions
 ): Promise<number | undefined> {
     try {
+        const headers: Record<string, string> = { 'User-Agent': DEFAULT_USER_AGENT };
+        if (options?.headers) {
+            for (const [key, value] of Object.entries(options.headers)) {
+                headers[key] = value;
+            }
+        }
+
         const response = await fetch(url, {
             method: 'HEAD',
             signal: AbortSignal.timeout(options?.timeout ?? FETCH_TIMEOUT_DEFAULT_MS),
-            headers: { 'User-Agent': DEFAULT_USER_AGENT }
+            headers
         });
 
         if (!response.ok) {

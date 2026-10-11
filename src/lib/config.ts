@@ -1,10 +1,12 @@
 import { ProviderStrategy, WebSearchProvider } from './types.js';
 import type { ProviderEntry } from './types.js';
+import type { HeaderRule } from './header-rules.js';
 import { envInt, envString, envEnum } from './env.js';
 
 const MAX_CHARS_PER_FETCH_DEFAULT = 10_000;
 const MAX_CHARS_PER_FETCH_LIMIT = 100_000;
 const MAX_CONTENT_LENGTH_BYTES_DEFAULT = 10_000_000;
+const MAX_PDF_PAGES_DEFAULT = 100;
 /** Default timeout (ms) for individual HTTP fetch requests. */
 export const FETCH_TIMEOUT_DEFAULT_MS = 5_000;
 /** Default timeout (ms) for search provider API calls. */
@@ -148,4 +150,8 @@ export class WebFetchConfiguration {
     );
     /** Max concurrent fetch requests (env: `LLM_CHAT_WEB_FETCH_CONCURRENCY`). */
     concurrency: number = envInt('LLM_CHAT_WEB_FETCH_CONCURRENCY', CONCURRENCY_DEFAULT);
+    /** Default max pages extracted from a PDF (env: `LLM_CHAT_WEB_MAX_PDF_PAGES`). */
+    maxPdfPages: number = envInt('LLM_CHAT_WEB_MAX_PDF_PAGES', MAX_PDF_PAGES_DEFAULT);
+    /** Host-controlled header rules applied to matching URLs (config only, no env var). */
+    headerRules: HeaderRule[] = [];
 }

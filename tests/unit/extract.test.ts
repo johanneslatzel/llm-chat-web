@@ -6,6 +6,7 @@ vi.mock('@mozilla/readability', () => ({
 }));
 
 import { isProbablyReaderable, Readability } from '@mozilla/readability';
+import { JSDOM } from 'jsdom';
 import { extractText } from '../../src/lib/extract.js';
 
 const MIN_CONTENT = 'This is a sufficiently long text content that should pass the minimum length threshold for extraction and demonstrate proper handling of various edge cases in the extraction pipeline.';
@@ -111,5 +112,24 @@ describe('extractText', () => {
         expect(result.title).toBe('Empty');
         expect(result.textContent).toBe('');
         expect(result.content).toBe('');
+    });
+
+    it('does not forward jsdom CSS parse errors to the console', () => {
+        vi.mocked(isProbablyReaderable).mockReturnValue(false);
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const html =
+            '<html><head><style>..broken { color: red } }</style></head>' +
+            '<body><p>Body content long enough to be extracted by the fallback path in this particular test scenario for the console noise check.</p></body></html>';
+
+        // Sanity check: this CSS makes jsdom report a parse error with the default console.
+        new JSDOM(html);
+        expect(errorSpy).toHaveBeenCalled();
+        errorSpy.mockClear();
+
+        extractText(html);
+        expect(errorSpy).not.toHaveBeenCalled();
+
+        errorSpy.mockRestore();
     });
 });

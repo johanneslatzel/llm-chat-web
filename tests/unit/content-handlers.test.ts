@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { FetchRegistry } from '../../src/lib/fetch-registry.js';
-import { truncate } from '../../src/lib/content-handlers/util.js';
+import { truncateWithInfo } from '../../src/lib/content-handlers/util.js';
 import { ResultStatus } from '@johannes.latzel/llm-chat';
+
+const enc = (value: string): Uint8Array => new TextEncoder().encode(value);
 
 function registry(): FetchRegistry {
     const r = new FetchRegistry();
@@ -101,8 +103,16 @@ describe('ContentHandlerRegistry', () => {
         expect(h!.name).toBe('html');
     });
 
-    it('returns undefined for application/pdf', () => {
-        expect(registry().getHandler('application/pdf')).toBeUndefined();
+    it('returns the pdf handler for application/pdf', () => {
+        const h = registry().getHandler('application/pdf');
+        expect(h).toBeDefined();
+        expect(h!.name).toBe('pdf');
+    });
+
+    it('returns the pdf handler for application/x-pdf', () => {
+        const h = registry().getHandler('application/x-pdf');
+        expect(h).toBeDefined();
+        expect(h!.name).toBe('pdf');
     });
 
     it('returns undefined for image/png', () => {
@@ -131,7 +141,12 @@ describe('HTML handler', () => {
         const html = `<!DOCTYPE html>
 <html><head><title>Test Page</title></head>
 <body><article><h1>Article Title</h1><p>This is the article content with enough text to pass the readability threshold. It needs to be at least one hundred characters long so that the extractor treats it as meaningful content rather than noise or boilerplate. Here is some more padding to make sure we cross the threshold comfortably.</p></article></body></html>`;
-        const result = await handler.handle(html, 'http://example.com', 'http://example.com', 10000);
+        const result = await handler.handle(
+            enc(html),
+            'http://example.com',
+            'http://example.com',
+            { maxChars: 10000 }
+        );
         expect(result.status).toBe(ResultStatus.Success);
         expect(result.result).toContain('Article Title');
         expect(result.result).toContain('article content');
@@ -143,10 +158,10 @@ describe('JSON handler', () => {
     it('returns pretty-printed JSON for valid JSON', async () => {
         const handler = registry().getHandler('application/json')!;
         const result = await handler.handle(
-            '{"a":1,"b":2,"c":{"d":3}}',
+            enc('{"a":1,"b":2,"c":{"d":3}}'),
             'http://example.com',
             'http://example.com',
-            10000
+            { maxChars: 10000 }
         );
         expect(result.status).toBe(ResultStatus.Success);
         expect(result.result).toContain('"a": 1');
@@ -157,10 +172,10 @@ describe('JSON handler', () => {
     it('returns error for invalid JSON', async () => {
         const handler = registry().getHandler('application/json')!;
         const result = await handler.handle(
-            '{invalid}',
+            enc('{invalid}'),
             'http://example.com',
             'http://example.com',
-            10000
+            { maxChars: 10000 }
         );
         expect(result.status).toBe(ResultStatus.Error);
         expect(result.result).toBe('JSON could not be parsed');
@@ -169,9 +184,15 @@ describe('JSON handler', () => {
     it('truncates JSON output', async () => {
         const handler = registry().getHandler('application/json')!;
         const data = '{"a":' + JSON.stringify('x'.repeat(500)) + '}';
-        const result = await handler.handle(data, 'http://example.com', 'http://example.com', 50);
+        const result = await handler.handle(
+            enc(data),
+            'http://example.com',
+            'http://example.com',
+            { maxChars: 50 }
+        );
         expect(result.status).toBe(ResultStatus.Success);
         expect(result.result).toContain('[truncated]');
+        expect(result.result).toContain('JSON truncated to');
     });
 });
 
@@ -179,10 +200,10 @@ describe('XML handler', () => {
     it('returns raw body as-is', async () => {
         const handler = registry().getHandler('application/xml')!;
         const result = await handler.handle(
-            '<root><item id="1">value</item></root>',
+            enc('<root><item id="1">value</item></root>'),
             'http://example.com',
             'http://example.com',
-            10000
+            { maxChars: 10000 }
         );
         expect(result.status).toBe(ResultStatus.Success);
         expect(result.result).toContain('<root><item id="1">value</item></root>');
@@ -193,10 +214,10 @@ describe('CSV handler', () => {
     it('returns raw body as-is', async () => {
         const handler = registry().getHandler('text/csv')!;
         const result = await handler.handle(
-            'name,age\nAlice,30\nBob,25',
+            enc('name,age\nAlice,30\nBob,25'),
             'http://example.com',
             'http://example.com',
-            10000
+            { maxChars: 10000 }
         );
         expect(result.status).toBe(ResultStatus.Success);
         expect(result.result).toContain('Alice');
@@ -208,10 +229,10 @@ describe('Markdown handler', () => {
     it('returns raw body as-is', async () => {
         const handler = registry().getHandler('text/markdown')!;
         const result = await handler.handle(
-            '# Heading\n\nSome *emphasized* text.',
+            enc('# Heading\n\nSome *emphasized* text.'),
             'http://example.com',
             'http://example.com',
-            10000
+            { maxChars: 10000 }
         );
         expect(result.status).toBe(ResultStatus.Success);
         expect(result.result).toContain('# Heading');
@@ -223,13 +244,25 @@ describe('Plain-text handler', () => {
     it('returns raw body as-is', async () => {
         const handler = registry().getHandler('text/plain')!;
         const result = await handler.handle(
-            'Just some plain text',
+            enc('Just some plain text'),
             'http://example.com',
             'http://example.com',
-            10000
+            { maxChars: 10000 }
         );
         expect(result.status).toBe(ResultStatus.Success);
         expect(result.result).toBe('Just some plain text');
+    });
+
+    it('appends a character-count hint when truncated', async () => {
+        const handler = registry().getHandler('text/plain')!;
+        const result = await handler.handle(
+            enc('A'.repeat(200)),
+            'http://example.com',
+            'http://example.com',
+            { maxChars: 20 }
+        );
+        expect(result.status).toBe(ResultStatus.Success);
+        expect(result.result).toContain('[text truncated to 20 of 200 characters]');
     });
 });
 
@@ -237,10 +270,10 @@ describe('Generic text handler', () => {
     it('handles text/javascript as generic text', async () => {
         const handler = registry().getHandler('text/javascript')!;
         const result = await handler.handle(
-            'const x = 1;',
+            enc('const x = 1;'),
             'http://example.com',
             'http://example.com',
-            10000
+            { maxChars: 10000 }
         );
         expect(result.status).toBe(ResultStatus.Success);
         expect(result.result).toContain('const x = 1;');
@@ -252,38 +285,51 @@ describe('Generic text handler', () => {
     });
 });
 
-describe('truncate', () => {
+describe('truncateWithInfo', () => {
     it('returns full text when under limit', () => {
-        expect(truncate('hello', 100)).toBe('hello');
+        expect(truncateWithInfo('hello', 100).text).toBe('hello');
     });
 
     it('truncates at paragraph boundary', () => {
         const text = 'P1 text.\n\nP2 text.\n\nP3 text.\n\nP4 text.';
-        const result = truncate(text, 30);
+        const result = truncateWithInfo(text, 30).text;
         expect(result).toContain('[truncated]');
     });
 
     it('truncates at sentence boundary', () => {
         const text = 'Sentence one. Sentence two. Sentence three. Sentence four.';
-        const result = truncate(text, 50);
+        const result = truncateWithInfo(text, 50).text;
         expect(result).toContain('[truncated]');
     });
 
     it('truncates at word boundary', () => {
         const text = 'word '.repeat(200);
-        const result = truncate(text, 100);
+        const result = truncateWithInfo(text, 100).text;
         expect(result).toContain('[truncated]');
         expect(result).toMatch(/ \.\.\. \[truncated\]$/);
     });
 
     it('truncates at hard cut when no boundary available', () => {
         const text = 'A'.repeat(500);
-        const result = truncate(text, 50);
+        const result = truncateWithInfo(text, 50).text;
         expect(result).toContain('[truncated]');
     });
 
     it('returns marker-only when budget exhausted by truncation overhead', () => {
-        const result = truncate('some text', 5);
+        const result = truncateWithInfo('some text', 5).text;
         expect(result).toBe('... [truncated]');
+    });
+
+    it('reports retained and original lengths', () => {
+        expect(truncateWithInfo('hello', 100)).toEqual({
+            text: 'hello',
+            keptLength: 5,
+            originalLength: 5
+        });
+        expect(truncateWithInfo('A'.repeat(500), 50)).toEqual({
+            text: 'A'.repeat(50) + ' [truncated]',
+            keptLength: 50,
+            originalLength: 500
+        });
     });
 });

@@ -87,6 +87,23 @@ describe('WebFetchConfiguration', () => {
         expect(cfg.maxCharsPerFetchLimit).toBe(100000);
     });
 
+    it('defaults maxPdfPages to 100', () => {
+        delete process.env.LLM_CHAT_WEB_MAX_PDF_PAGES;
+        const cfg = new WebFetchConfiguration();
+        expect(cfg.maxPdfPages).toBe(100);
+    });
+
+    it('reads maxPdfPages from env', () => {
+        process.env.LLM_CHAT_WEB_MAX_PDF_PAGES = '250';
+        const cfg = new WebFetchConfiguration();
+        expect(cfg.maxPdfPages).toBe(250);
+    });
+
+    it('defaults headerRules to an empty list', () => {
+        const cfg = new WebFetchConfiguration();
+        expect(cfg.headerRules).toEqual([]);
+    });
+
     it('defaults fetch timeout values when no env set', () => {
         delete process.env.LLM_CHAT_WEB_FETCH_TIMEOUT_MS;
         delete process.env.LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES;

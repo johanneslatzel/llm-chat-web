@@ -4,8 +4,15 @@ import { GenericTextHandler } from './content-handlers/generic-text-handler.js';
 import { HtmlHandler } from './content-handlers/html-handler.js';
 import { JsonHandler } from './content-handlers/json-handler.js';
 import { MarkdownHandler } from './content-handlers/markdown-handler.js';
+import { PdfHandler } from './content-handlers/pdf-handler.js';
 import { PlainTextHandler } from './content-handlers/plain-text-handler.js';
 import { XmlHandler } from './content-handlers/xml-handler.js';
+
+/** Options used when registering the built-in handler set. */
+export interface FetchRegistryOptions {
+    /** Default page cap passed to the built-in {@link PdfHandler}. */
+    maxPdfPages?: number;
+}
 
 /**
  * A registry that maps HTTP `Content-Type` values to their matching
@@ -47,12 +54,15 @@ export class FetchRegistry {
      *
      * This is called automatically by {@link init} when no handlers have been
      * registered yet. The registration order (most specific first) is:
-     * html → json → xml → csv → markdown → plain-text → generic-text.
+     * html → json → xml → pdf → csv → markdown → plain-text → generic-text.
+     *
+     * @param options Options forwarded to the built-in handlers (e.g. the PDF page cap).
      */
-    registerDefaults(): void {
+    registerDefaults(options?: FetchRegistryOptions): void {
         this.register(new HtmlHandler());
         this.register(new JsonHandler());
         this.register(new XmlHandler());
+        this.register(new PdfHandler({ maxPages: options?.maxPdfPages }));
         this.register(new CsvHandler());
         this.register(new MarkdownHandler());
         this.register(new PlainTextHandler());
@@ -65,12 +75,14 @@ export class FetchRegistry {
      * Safe to call multiple times — only the first invocation has any effect.
      * If no handlers have been {@link register}ed yet, {@link registerDefaults}
      * is called to populate the built-in set.
+     *
+     * @param options Options forwarded to {@link registerDefaults}.
      */
-    init(): void {
+    init(options?: FetchRegistryOptions): void {
         if (this.isInitialized) return;
         this.isInitialized = true;
         if (this.handlers.length === 0) {
-            this.registerDefaults();
+            this.registerDefaults(options);
         }
     }
 }

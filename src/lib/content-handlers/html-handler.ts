@@ -1,8 +1,8 @@
 import { ResultStatus } from '@johannes.latzel/llm-chat';
 import type { PartialToolResult } from '@johannes.latzel/llm-chat';
-import type { ContentHandler } from '../content-handler.js';
+import type { ContentHandler, HandleOptions } from '../content-handler.js';
 import { extractText } from '../extract.js';
-import { truncate } from './util.js';
+import { appendHint, decodeBody, truncateWithHint } from './util.js';
 
 /**
  * Handles `text/html` responses by extracting readable content via
@@ -20,12 +20,21 @@ export class HtmlHandler implements ContentHandler {
      * Extract clean text from the HTML body and format as
      * `Title\n\nContent\n\nURL: <responseUrl>`.
      */
-    handle(body: string, url: string, responseUrl: string, maxChars: number): PartialToolResult {
-        const extracted = extractText(body, url);
+    handle(
+        body: Uint8Array,
+        url: string,
+        responseUrl: string,
+        options: HandleOptions
+    ): PartialToolResult {
+        const extracted = extractText(decodeBody(body), url);
         const title = extracted.title || url;
-        const content = truncate(extracted.textContent, maxChars);
+        const { text, hint } = truncateWithHint(
+            extracted.textContent,
+            options.maxChars,
+            'HTML text'
+        );
         return {
-            result: `${title}\n\n${content}\n\nURL: ${responseUrl}`,
+            result: appendHint(`${title}\n\n${text}\n\nURL: ${responseUrl}`, hint),
             status: ResultStatus.Success
         };
     }

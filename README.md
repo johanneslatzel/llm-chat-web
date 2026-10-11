@@ -16,14 +16,14 @@ Web tool suite for the `llm-chat` ecosystem. Equips LLM agents with web search a
 ## Features
 
 - `web_search` tool: four search providers (DuckDuckGo free and keyless, Tavily, ExaAI, Firecrawl) combinable via multi-provider strategies (single, parallel, fallback, weighted_random, round_robin)
-- `web_fetch` tool: intelligent URL fetching with Mozilla Readability extraction, CSS-selector fallback, and built-in content-type handlers for HTML, JSON, XML, CSV, Markdown, and plain text
+- `web_fetch` tool: intelligent URL fetching with Mozilla Readability extraction, CSS-selector fallback, built-in content-type handlers for HTML, JSON, XML, CSV, Markdown, plain text, and PDF text extraction (no OCR), and host-controlled header rules matched by URL pattern
 - parallel execution of queries and fetches with configurable concurrency
 - Content-Length pre-check on URL fetches to reject oversized responses before downloading
 - configurable via config objects and env vars
 
 ## Prerequisites
 
-- Node.js >= 20.19
+- Node.js `^22.22.2 || ^24.15.0 || >=26`
 
 ## Installation
 

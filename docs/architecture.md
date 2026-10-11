@@ -90,19 +90,27 @@ When content exceeds `max_chars`, the truncation algorithm walks down boundary t
 
 The `[truncated]` marker is included in the character budget. Its prefix depends on the boundary used: `\n\n[truncated]` after a paragraph break, ` [truncated]` after a sentence break or hard cut, and ` ...[truncated]` after a word break.
 
+When truncation happened, a character-count hint is appended after the marker, e.g. `[HTML text truncated to 100 of 500 characters]`. The label names the content type (`PDF text`, `HTML text`, `JSON`, or `text`). `truncateWithHint()` produces the truncated text plus the hint, and `appendHint()` appends it to the result.
+
 #### Content-size guard
 
 Before downloading, the tool sends a `HEAD` request to check `Content-Length`. If it exceeds the configured limit, the fetch is rejected immediately.
 
 #### Content-type handler dispatch
 
-When a response is received, `WebFetchTool` looks up the `Content-Type` header in a `FetchRegistry`: a list of `ContentHandler` instances checked in registration order. The first handler whose `match()` returns `true` processes the body via `handle()`.
+When a response is received, `WebFetchTool` looks up the `Content-Type` header in a `FetchRegistry`: a list of `ContentHandler` instances checked in registration order. The first handler whose `match()` returns `true` processes the body via `handle()`. The body is passed as a `Uint8Array` together with a `HandleOptions` object (`{ maxChars, maxPages? }`); text handlers decode it as UTF-8, while binary handlers (such as PDF) read the bytes directly.
 
 `WebFetchTool` creates its own `FetchRegistry` if none is provided and calls `init()` in its constructor. Built-in defaults are populated only if no custom handlers were registered beforehand, so a registry with custom handlers takes priority over the built-in set (see [usage](usage.md#content-type-handling) for the handler table and examples).
+
+#### Header rules
+
+`WebFetchConfiguration.headerRules` holds host-controlled `HeaderRule` entries (`{ pattern, headers }`). `resolveHeaderRules(url, rules)` matches each pattern against the full URL with `@johannes.latzel/pattern-specific`, merges the matches from least to most specific (more specific overrides), and the result is passed to both the content-length `HEAD` probe and the `GET` request. Headers are never supplied by the model.
 
 ## Dependencies
 
 - `@johannes.latzel/llm-chat`: framework providing `Tool`, `ToolParameters`, `ResultStatus`, `ResultBuilder`, etc.
+- `@johannes.latzel/pattern-specific`: glob matching and most-specific-wins ordering
 - `@mozilla/readability`: article content extraction
 - `jsdom`: server-side DOM for Readability integration
+- `unpdf`: PDF text extraction (bundled Mozilla PDF.js)
 - `p-map`: concurrency-limited parallel execution

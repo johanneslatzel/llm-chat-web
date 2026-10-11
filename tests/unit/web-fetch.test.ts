@@ -152,6 +152,7 @@ describe('WebFetchTool', () => {
         const result = await tool.execute({ urls: ['https://example.com'], max_chars: 100 });
         expect(result[0]!.status).toBe(ResultStatus.Success);
         expect(result[0]!.result).toContain('[truncated]');
+        expect(result[0]!.result).toContain('HTML text truncated to');
     });
 
     it('respects per-request max_chars', async () => {
@@ -171,16 +172,76 @@ describe('WebFetchTool', () => {
         expect(result[0]!.status).toBe(ResultStatus.Success);
     });
 
+    it('rejects maxPages above the configured maximum', async () => {
+        const tool = new WebFetchTool(cfg);
+        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 999 });
+        expect(result[0]!.status).toBe(ResultStatus.Error);
+        expect(result[0]!.result).toContain('maxPages');
+        expect(result[0]!.result).toContain('exceeds the configured maximum');
+    });
+
+    it('rejects a non-integer maxPages', async () => {
+        const tool = new WebFetchTool(cfg);
+        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 1.5 });
+        expect(result[0]!.status).toBe(ResultStatus.Error);
+        expect(result[0]!.result).toContain('positive integer');
+    });
+
+    it('rejects a non-number maxPages', async () => {
+        const tool = new WebFetchTool(cfg);
+        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 'x' });
+        expect(result[0]!.status).toBe(ResultStatus.Error);
+        expect(result[0]!.result).toContain('positive integer');
+    });
+
+    it('rejects maxPages below 1', async () => {
+        const tool = new WebFetchTool(cfg);
+        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 0 });
+        expect(result[0]!.status).toBe(ResultStatus.Error);
+        expect(result[0]!.result).toContain('positive integer');
+    });
+
+    it('accepts a maxPages within the configured maximum', async () => {
+        mockFetch({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            body: 'plain text long enough to pass through the handler without any issues at all',
+            headers: { 'content-type': 'text/plain' }
+        });
+        const tool = new WebFetchTool(cfg);
+        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 5 });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+    });
+
+    it('sends resolved header rules on the HEAD and GET requests', async () => {
+        const headerCfg = new WebFetchConfiguration();
+        headerCfg.headerRules = [
+            {
+                pattern: 'https://api.example.com/**',
+                headers: { Authorization: 'Bearer token' }
+            }
+        ];
+        mockFetch(htmlResponse(SAMPLE_HTML));
+        const tool = new WebFetchTool(headerCfg);
+        await tool.execute({ urls: ['https://api.example.com/data'] });
+
+        const calls = vi.mocked(globalThis.fetch).mock.calls;
+        expect(calls).toHaveLength(2);
+        expect(calls[0]![1]!.headers).toMatchObject({ Authorization: 'Bearer token' });
+        expect(calls[1]![1]!.headers).toMatchObject({ Authorization: 'Bearer token' });
+    });
+
     it('rejects unsupported content-type', async () => {
         mockFetch({
             ok: true,
             status: 200,
             statusText: 'OK',
-            body: '%PDF-1.4...',
-            headers: { 'content-type': 'application/pdf' }
+            body: 'binary',
+            headers: { 'content-type': 'image/png' }
         });
         const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com/doc.pdf'] });
+        const result = await tool.execute({ urls: ['https://example.com/image.png'] });
         expect(result[0]!.status).toBe(ResultStatus.Error);
         expect(result[0]!.result).toContain('Unsupported content type');
     });
@@ -238,9 +299,8 @@ describe('WebFetchTool', () => {
         const result = await tool.execute({ urls: ['https://example.com'], max_chars: 100 });
         expect(result[0]!.status).toBe(ResultStatus.Success);
         const content = result[0]!.result as string;
-        expect(content).toContain('[truncated]');
-        const truncatedText = content.replace(/[\s\S]*?\n\n/, '').replace(/\n\nURL:.*/, '');
-        expect(truncatedText).toMatch(/ \.\.\. \[truncated\]$/);
+        expect(content).toContain(' ... [truncated]');
+        expect(content).toContain('[HTML text truncated to');
     });
 
     it('rejects content exceeding max content length via HEAD', async () => {
@@ -287,6 +347,12 @@ describe('WebFetchTool', () => {
                 Promise.resolve(
                     '<html><body><article><p>Content with enough text for extraction and testing the url fallback behavior in this scenario.</p></article></body></html>'
                 ),
+            arrayBuffer: () =>
+                Promise.resolve(
+                    new TextEncoder().encode(
+                        '<html><body><article><p>Content with enough text for extraction and testing the url fallback behavior in this scenario.</p></article></body></html>'
+                    ).buffer
+                ),
             headers: new Headers({ 'content-type': 'text/html' }),
             url: ''
         } as unknown as Response);
@@ -304,6 +370,12 @@ describe('WebFetchTool', () => {
             text: () =>
                 Promise.resolve(
                     'plain text content that is long enough for extraction and testing purposes in this test scenario for the fallback path.'
+                ),
+            arrayBuffer: () =>
+                Promise.resolve(
+                    new TextEncoder().encode(
+                        'plain text content that is long enough for extraction and testing purposes in this test scenario for the fallback path.'
+                    ).buffer
                 ),
             headers: { get: () => null, forEach: () => {} },
             url: 'http://example.com'
@@ -334,6 +406,7 @@ describe('WebFetchTool', () => {
                     status: 404,
                     statusText: 'Not Found',
                     text: () => Promise.resolve('Not Found'),
+                    arrayBuffer: () => Promise.resolve(new TextEncoder().encode('Not Found').buffer),
                     headers: new Headers({ 'content-type': 'text/html' })
                 } as unknown as Response);
             }
@@ -342,6 +415,7 @@ describe('WebFetchTool', () => {
                 status: 200,
                 statusText: 'OK',
                 text: () => Promise.resolve(SAMPLE_HTML),
+                arrayBuffer: () => Promise.resolve(new TextEncoder().encode(SAMPLE_HTML).buffer),
                 headers: new Headers({ 'content-type': 'text/html' })
             } as unknown as Response);
         });

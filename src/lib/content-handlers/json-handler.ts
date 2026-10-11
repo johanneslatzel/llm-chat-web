@@ -1,7 +1,7 @@
 import { ResultStatus } from '@johannes.latzel/llm-chat';
 import type { PartialToolResult } from '@johannes.latzel/llm-chat';
-import type { ContentHandler } from '../content-handler.js';
-import { truncate } from './util.js';
+import type { ContentHandler, HandleOptions } from '../content-handler.js';
+import { appendHint, decodeBody, truncateWithHint } from './util.js';
 
 /**
  * Handles `application/json` (and `application/*+json`) responses by
@@ -21,11 +21,17 @@ export class JsonHandler implements ContentHandler {
     }
 
     /** Pretty-print the JSON body and truncate if necessary. */
-    handle(body: string, _url: string, _responseUrl: string, maxChars: number): PartialToolResult {
+    handle(
+        body: Uint8Array,
+        _url: string,
+        _responseUrl: string,
+        options: HandleOptions
+    ): PartialToolResult {
         try {
-            const content = JSON.stringify(JSON.parse(body), null, 2);
+            const content = JSON.stringify(JSON.parse(decodeBody(body)), null, 2);
+            const { text, hint } = truncateWithHint(content, options.maxChars, 'JSON');
             return {
-                result: truncate(content, maxChars),
+                result: appendHint(text, hint),
                 status: ResultStatus.Success
             };
         } catch {

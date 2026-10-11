@@ -121,6 +121,7 @@ Fetch one or more URLs in parallel and return their content as clean text. Each 
 |---|---|---|---|
 | `urls` | `string[]` | yes | Array of URLs to fetch |
 | `max_chars` | `number` | no | Override max characters returned per URL (clamped to `[1, maxCharsPerFetchLimit]`) |
+| `maxPages` | `number` | no | Max pages to extract from a paginated document (currently only PDF); must be a positive integer and no greater than `maxPdfPages`, otherwise the call fails |
 
 ### Returns
 
@@ -169,6 +170,7 @@ The tool dispatches the response content type to a registered handler from the `
 | `text/csv` | Returned as-is |
 | `text/markdown` | Returned as-is |
 | `text/plain` | Returned as-is |
+| `application/pdf` / `application/x-pdf` | Text layer extracted with PDF.js (no OCR); a scanned/image-only PDF returns an explanatory message; page and character truncation are noted in the output |
 | Other `text/*` | Returned as-is |
 | Other types | Rejected with "Unsupported content type" |
 
@@ -186,14 +188,33 @@ const registry = new ContentHandlerRegistry();
 registry.register({
     name: 'my-handler',
     match: (ct) => ct.startsWith('text/html'),
-    handle: (body, url, responseUrl, maxChars) => {
-        return { result: body, status: ResultStatus.Success };
+    handle: (body, url, responseUrl, options) => {
+        const text = new TextDecoder().decode(body);
+        return { result: text.slice(0, options.maxChars), status: ResultStatus.Success };
     }
 });
 // Registering a custom handler replaces the built-in defaults entirely.
 
 const tool = new WebFetchTool(new WebFetchConfiguration(), registry);
 ```
+
+### Header rules
+
+`WebFetchConfiguration.headerRules` injects headers for matching URLs. Each rule is a glob pattern matched against the full URL. Matching rules are merged from least specific to most specific, so a more specific rule overrides a less specific one for the same header name:
+
+```typescript
+import { WebFetchConfiguration, WebFetchTool } from '@johannes.latzel/llm-chat-web';
+
+const config = new WebFetchConfiguration();
+config.headerRules = [
+    { pattern: 'https://api.example.com/**', headers: { Accept: 'application/json' } },
+    { pattern: 'https://api.example.com/v2/**', headers: { Authorization: 'Bearer token' } }
+];
+
+const tool = new WebFetchTool(config);
+```
+
+Resolved headers are sent on both the content-length `HEAD` probe and the `GET` request. There is no model-facing headers parameter: only the host configures rules.
 
 ### JSON pretty-printing
 
@@ -205,7 +226,7 @@ See [architecture](architecture.md#content-extraction) for the full HTML extract
 
 ### Truncation
 
-When content exceeds `max_chars`, the tool truncates at the nearest boundary: paragraph break, sentence break, word break, or hard character cut. A `[truncated]` marker is appended. See [architecture](architecture.md#truncation) for the detailed algorithm.
+When content exceeds `max_chars`, the tool truncates at the nearest boundary: paragraph break, sentence break, word break, or hard character cut. A `[truncated]` marker is appended, followed by a character-count hint such as `[PDF text truncated to 50 of 500 characters]` (the label names the content type). See [architecture](architecture.md#truncation) for the detailed algorithm.
 
 ### Content-size guard
 

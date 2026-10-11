@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { getContentLength } from '../../src/lib/http.js';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { fetchWithTimeout, getContentLength } from '../../src/lib/http.js';
 import { mockFetch, restoreFetch } from '../index.js';
 
 describe('getContentLength', () => {
@@ -53,5 +53,24 @@ describe('getContentLength', () => {
         });
         const length = await getContentLength('https://example.com/secret');
         expect(length).toBeUndefined();
+    });
+});
+
+describe('fetchWithTimeout', () => {
+    afterEach(() => {
+        restoreFetch();
+    });
+
+    it('uses the default User-Agent when no headers are given', async () => {
+        mockFetch({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            body: '',
+            headers: { 'content-type': 'text/html' }
+        });
+        await fetchWithTimeout('https://example.com');
+        const calls = vi.mocked(globalThis.fetch).mock.calls;
+        expect(calls[0]![1]!.headers).toEqual({ 'User-Agent': 'llm-chat-web' });
     });
 });

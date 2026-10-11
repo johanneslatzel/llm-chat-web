@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js >= 20.19
+- Node.js `^22.22.2 || ^24.15.0 || >=26`
 
 ## Installation
 

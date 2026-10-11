@@ -1,6 +1,7 @@
 import { WebFetchConfiguration } from '../lib/config.js';
 import { fetchWithTimeout, getContentLength } from '../lib/http.js';
 import { FetchRegistry } from '../lib/fetch-registry.js';
+import { resolveHeaderRules } from '../lib/header-rules.js';
 import {
     PropertyType,
     ResultBuilder,
@@ -24,12 +25,16 @@ export class WebFetchTool extends Tool {
     constructor(config: WebFetchConfiguration, registry?: FetchRegistry) {
         super(
             'web_fetch',
-            'Fetches one or more URLs in parallel and returns their content as clean text. Pass an array of URLs ("urls"). Use this when you need to read web pages, JSON APIs, XML feeds, or other text-based content.',
+            'Fetches one or more URLs in parallel and returns their content as clean text. Pass an array of URLs ("urls"). Use this when you need to read web pages, PDFs, JSON APIs, XML feeds, or other content.',
             new ToolParameters(
                 {
                     urls: new ToolParameterProperty('Array of URLs to fetch', PropertyType.Array),
                     max_chars: new ToolParameterProperty(
                         'Maximum characters to return per URL (default: 10000, max: 100000)',
+                        PropertyType.Number
+                    ),
+                    maxPages: new ToolParameterProperty(
+                        'Maximum number of pages to extract from a document',
                         PropertyType.Number
                     )
                 },
@@ -38,7 +43,7 @@ export class WebFetchTool extends Tool {
         );
         this.config = config;
         this.registry = registry ?? new FetchRegistry();
-        this.registry.init();
+        this.registry.init({ maxPdfPages: this.config.maxPdfPages });
     }
 
     /**
@@ -64,9 +69,31 @@ export class WebFetchTool extends Tool {
                   )
                 : this.config.maxCharsPerFetch;
 
+        const requestedMaxPages = args.maxPages;
+        let maxPages: number | undefined;
+        if (requestedMaxPages !== undefined) {
+            if (
+                typeof requestedMaxPages !== 'number' ||
+                !Number.isInteger(requestedMaxPages) ||
+                requestedMaxPages < 1
+            ) {
+                return {
+                    result: "'maxPages' must be a positive integer",
+                    status: ResultStatus.Error
+                };
+            }
+            if (requestedMaxPages > this.config.maxPdfPages) {
+                return {
+                    result: `'maxPages' (${requestedMaxPages}) exceeds the configured maximum of ${this.config.maxPdfPages}`,
+                    status: ResultStatus.Error
+                };
+            }
+            maxPages = requestedMaxPages;
+        }
+
         const concurrency = Math.max(1, this.config.concurrency);
 
-        const promises = rawUrls.map((u) => () => this.fetchSingleUrl(u, maxChars));
+        const promises = rawUrls.map((u) => () => this.fetchSingleUrl(u, maxChars, maxPages));
 
         try {
             const results = await pMap(promises, (fn) => fn(), {
@@ -87,9 +114,14 @@ export class WebFetchTool extends Tool {
      *
      * @param url      The URL to fetch.
      * @param maxChars Max characters to return.
+     * @param maxPages Optional page cap for PDF responses.
      * @returns A PartialToolResult with the fetched content or an error.
      */
-    private async fetchSingleUrl(url: unknown, maxChars: number): Promise<PartialToolResult> {
+    private async fetchSingleUrl(
+        url: unknown,
+        maxChars: number,
+        maxPages?: number
+    ): Promise<PartialToolResult> {
         if (typeof url !== 'string' || !url.trim()) {
             return {
                 result: 'URL must be a non-empty string',
@@ -100,8 +132,11 @@ export class WebFetchTool extends Tool {
         const trimmedUrl = url.trim();
 
         try {
+            const headers = resolveHeaderRules(trimmedUrl, this.config.headerRules);
+
             const contentLength = await getContentLength(trimmedUrl, {
-                timeout: this.config.fetchTimeoutMs
+                timeout: this.config.fetchTimeoutMs,
+                headers
             });
 
             if (contentLength !== undefined && contentLength > this.config.maxContentLengthBytes) {
@@ -112,7 +147,8 @@ export class WebFetchTool extends Tool {
             }
 
             const response = await fetchWithTimeout(trimmedUrl, {
-                timeout: this.config.fetchTimeoutMs
+                timeout: this.config.fetchTimeoutMs,
+                headers
             });
 
             if (!response.ok) {
@@ -132,9 +168,12 @@ export class WebFetchTool extends Tool {
                 };
             }
 
-            const body = await response.text();
+            const body = new Uint8Array(await response.arrayBuffer());
 
-            return await handler.handle(body, trimmedUrl, response.url || trimmedUrl, maxChars);
+            return await handler.handle(body, trimmedUrl, response.url || trimmedUrl, {
+                maxChars,
+                maxPages
+            });
         } catch (e) {
             const message = e instanceof Error ? e.message : 'Unknown fetch error';
             return {

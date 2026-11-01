@@ -13,6 +13,8 @@
 
 Web tool suite for the `llm-chat` ecosystem. Equips LLM agents with web search and URL fetching capabilities with intelligent content extraction.
 
+![llm-chat-web architecture](https://raw.githubusercontent.com/johanneslatzel/llm-chat-web/main/docs/assets/llm-chat-web-architecture.svg)
+
 ## Features
 
 - `web_search` tool: four search providers (DuckDuckGo free and keyless, Tavily, ExaAI, Firecrawl) combinable via multi-provider strategies (single, parallel, fallback, weighted_random, round_robin)

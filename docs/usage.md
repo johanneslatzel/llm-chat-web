@@ -1,5 +1,13 @@
 # Usage
 
+## Hidden parameter aliases
+
+Both array parameters accept a hidden singular alias: `url` for `urls` and
+`query` for `queries`. The alias is normalized before execution and is never
+exposed in the tool schema, so the model still sees the plural array parameter.
+See the
+[llm-chat tool documentation](https://github.com/johanneslatzel/llm-chat/blob/main/docs/tools/defining-tools.md#hidden-parameter-aliases).
+
 ## WebToolsPackage
 
 Both tools can be registered together as a single `ToolPackage`:
@@ -17,7 +25,8 @@ The package constructor accepts optional configuration per tool. If omitted, eac
 import {
     WebToolsPackage,
     WebSearchConfiguration,
-    WebFetchConfiguration
+    WebFetchConfiguration,
+    WebSearchProvider
 } from '@johannes.latzel/llm-chat-web';
 
 const pkg = new WebToolsPackage(
@@ -31,7 +40,7 @@ Individual configs can be overridden while others stay at defaults by omitting t
 
 ```typescript
 const pkg = new WebToolsPackage(
-    new WebSearchConfiguration(WebSearchProvider.Tavily, 'key')
+    new WebSearchConfiguration([{ provider: WebSearchProvider.Tavily, apiKey: 'key' }])
 );
 ```
 
@@ -62,9 +71,9 @@ Search results for "query":
 ### Basic Search
 
 ```typescript
-import { WebSearchTool, WebSearchConfiguration } from '@johannes.latzel/llm-chat-web';
+import { WebSearchTool, WebSearchConfiguration, WebSearchProvider } from '@johannes.latzel/llm-chat-web';
 
-const tool = new WebSearchTool(new WebSearchConfiguration(WebSearchProvider.Tavily, 'your-tavily-key'));
+const tool = new WebSearchTool(new WebSearchConfiguration([{ provider: WebSearchProvider.Tavily, apiKey: 'your-tavily-key' }]));
 const result = await tool.execute({ queries: ['latest AI news'] });
 console.log(result[0].result);
 ```
@@ -92,13 +101,13 @@ const result = await tool.execute({
 ```typescript
 import { WebSearchTool, WebSearchConfiguration, WebSearchProvider } from '@johannes.latzel/llm-chat-web';
 
-const exaConfig = new WebSearchConfiguration(WebSearchProvider.ExaAI, 'your-exa-key');
+const exaConfig = new WebSearchConfiguration([{ provider: WebSearchProvider.ExaAI, apiKey: 'your-exa-key' }]);
 const exaTool = new WebSearchTool(exaConfig);
 
-const ddgConfig = new WebSearchConfiguration(WebSearchProvider.DuckDuckGo);
+const ddgConfig = new WebSearchConfiguration([{ provider: WebSearchProvider.DuckDuckGo }]);
 const ddgTool = new WebSearchTool(ddgConfig);
 
-const fcConfig = new WebSearchConfiguration(WebSearchProvider.Firecrawl, 'your-firecrawl-key');
+const fcConfig = new WebSearchConfiguration([{ provider: WebSearchProvider.Firecrawl, apiKey: 'your-firecrawl-key' }]);
 const fcTool = new WebSearchTool(fcConfig);
 ```
 

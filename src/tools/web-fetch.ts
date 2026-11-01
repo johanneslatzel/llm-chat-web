@@ -28,7 +28,10 @@ export class WebFetchTool extends Tool {
             'Fetches one or more URLs in parallel and returns their content as clean text. Pass an array of URLs ("urls"). Use this when you need to read web pages, PDFs, JSON APIs, XML feeds, or other content.',
             new ToolParameters(
                 {
-                    urls: new ToolParameterProperty('Array of URLs to fetch', PropertyType.Array),
+                    urls: new ToolParameterProperty(
+                        'Array of URLs to fetch',
+                        PropertyType.Array
+                    ).accepts('url'),
                     max_chars: new ToolParameterProperty(
                         'Maximum characters to return per URL (default: 10000, max: 100000)',
                         PropertyType.Number

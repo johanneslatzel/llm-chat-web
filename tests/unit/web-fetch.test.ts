@@ -57,6 +57,23 @@ describe('WebFetchTool', () => {
         expect(result[0]!.result).toContain('article content');
     });
 
+    it('accepts url as a hidden alias for urls', async () => {
+        mockFetch(htmlResponse(SAMPLE_HTML));
+        const tool = new WebFetchTool(cfg);
+        const result = await tool.execute({ url: 'https://example.com' });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('Article Title');
+    });
+
+    it('does not expose url in the schema', () => {
+        const tool = new WebFetchTool(cfg);
+        const parameters = tool.toOpenAI().function.parameters as {
+            properties: Record<string, unknown>;
+        };
+        expect(parameters.properties.url).toBeUndefined();
+        expect(parameters.properties.urls).toBeDefined();
+    });
+
     it('reports missing urls', async () => {
         const tool = new WebFetchTool(cfg);
         const result = await tool.execute({});

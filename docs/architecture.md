@@ -4,6 +4,8 @@
 
 `@johannes.latzel/llm-chat-web` extends the `llm-chat` framework with web search and URL fetching tools: four search providers (DuckDuckGo, Tavily, ExaAI, Firecrawl) that can be combined into a single logical provider via configurable multi-provider strategies, HTML content extraction via Mozilla Readability, configurable content-type dispatch, and size-limited fetches with concurrency control.
 
+![llm-chat-web architecture](assets/llm-chat-web-architecture.svg)
+
 
 ## Design
 
@@ -47,7 +49,7 @@ Providers that require an API key extend `ApiKeySearchProvider`, which adds `Con
 
 DuckDuckGo does not require an API key but is subject to anti-bot challenge pages. The provider detects challenge pages via structural markers (e.g. `challenge-form`, "bots use DuckDuckGo") and retries with exponential backoff (max 2 retries, base 500ms). HTTP 403 and 429 responses are also retried. Search concurrency is capped at 1 when every configured provider entry is DuckDuckGo, to reduce IP-level throttling.
 
-Provider selection happens at construction time. `WebSearchTool` builds its effective provider via `resolveSearchProvider(config)`: every configured `ProviderEntry` is mapped to a concrete provider instance (missing weights default to 1), and the instances are wrapped in a `CompositeSearchProvider` that applies the configured `ProviderStrategy`. Search provider classes are not part of the public API.
+Provider selection happens when the tool executes. `WebSearchTool` builds its effective provider via `resolveSearchProvider(config)`: every configured `ProviderEntry` is mapped to a concrete provider instance (missing weights default to 1), and the instances are wrapped in a `CompositeSearchProvider` that applies the configured `ProviderStrategy`. Search provider classes are not part of the public API.
 
 #### Composite provider and strategies
 

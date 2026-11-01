@@ -52,6 +52,27 @@ describe('WebSearchTool', () => {
         expect(result[0]!.result).toContain('Result 1');
     });
 
+    it('accepts query as a hidden alias for queries', async () => {
+        mockFetch(
+            makeSearchResponse([
+                { title: 'Alias Result', url: 'https://example.com/alias', content: 'Alias content' }
+            ])
+        );
+        const tool = new WebSearchTool(cfg);
+        const result = await tool.execute({ query: 'alias query' });
+        expect(result[0]!.status).toBe(ResultStatus.Success);
+        expect(result[0]!.result).toContain('Alias Result');
+    });
+
+    it('does not expose query in the schema', () => {
+        const tool = new WebSearchTool(cfg);
+        const parameters = tool.toOpenAI().function.parameters as {
+            properties: Record<string, unknown>;
+        };
+        expect(parameters.properties.query).toBeUndefined();
+        expect(parameters.properties.queries).toBeDefined();
+    });
+
     it('reports missing queries', async () => {
         const tool = new WebSearchTool(cfg);
         const result = await tool.execute({});

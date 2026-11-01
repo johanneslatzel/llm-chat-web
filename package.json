@@ -1,6 +1,6 @@
 {
     "name": "@johannes.latzel/llm-chat-web",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Web tool suite for the llm-chat ecosystem",
     "license": "MIT",
     "sideEffects": false,
@@ -66,7 +66,7 @@
         ]
     },
     "dependencies": {
-        "@johannes.latzel/llm-chat": "^0.7.0",
+        "@johannes.latzel/llm-chat": "^0.10.0",
         "@johannes.latzel/pattern-specific": "^0.1.0",
         "@mozilla/readability": "^0.6.0",
         "jsdom": "^30.0.1",
@@ -79,7 +79,7 @@
         "@types/node": "^26.2.0",
         "@typescript-eslint/eslint-plugin": "^8.60.1",
         "@typescript-eslint/parser": "^8.60.1",
-        "@vitest/coverage-v8": "^4.1.11",
+        "@vitest/coverage-v8": "^5.0.5",
         "eslint": "^10.8.1",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-n": "^18.3.0",
@@ -89,6 +89,6 @@
         "@johannes.latzel/check-mkdocs": "^0.1.0",
         "prettier": "^3.8.3",
         "typescript": "^6.0.3",
-        "vitest": "^4.1.11"
+        "vitest": "^5.0.5"
     }
 }

@@ -47,7 +47,7 @@ export class WebSearchTool extends Tool {
                     queries: new ToolParameterProperty(
                         'Array of search queries',
                         PropertyType.Array
-                    ),
+                    ).accepts('query'),
                     max_results: new ToolParameterProperty(
                         'Maximum number of search results to return per query (default: 5, max: 20)',
                         PropertyType.Number

@@ -71,7 +71,7 @@
         "@mozilla/readability": "^0.6.0",
         "jsdom": "^30.0.1",
         "p-map": "^7.0.4",
-        "unpdf": "^1.8.1"
+        "unpdf": "^2.0.1"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

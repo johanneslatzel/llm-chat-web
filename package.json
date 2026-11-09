@@ -69,7 +69,7 @@
         "@johannes.latzel/llm-chat": "^0.10.0",
         "@johannes.latzel/pattern-specific": "^0.1.0",
         "@mozilla/readability": "^0.6.0",
-        "jsdom": "^30.0.1",
+        "jsdom": "^31.0.0",
         "p-map": "^7.0.4",
         "unpdf": "^1.8.1"
     },

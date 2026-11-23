@@ -8,6 +8,7 @@ Typed web search and URL fetching tools for the `@johannes.latzel/llm-chat` ecos
 - [Environment Variables](configuration.md): config classes and env vars
 - [Quick Start](quickstart.md): getting started guide
 - [Usage](usage.md): tool parameters, examples, and registration
+- [API Reference](api-reference.md): exported classes and methods
 
 ## License
 

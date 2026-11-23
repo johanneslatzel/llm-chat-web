@@ -1,7 +1,8 @@
-import { ResultStatus } from '@johannes.latzel/llm-chat';
-import type { PartialToolResult } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
+import type { PartialToolResult } from '@johannes.latzel/llm-chat-tool';
 import { extractText, getDocumentProxy } from 'unpdf';
 import type { ContentHandler, HandleOptions } from '../content-handler.js';
+import { MAX_PDF_PAGES_DEFAULT } from '../config.js';
 import { truncateWithHint } from './util.js';
 
 /** Options for {@link PdfHandler}. */
@@ -10,16 +11,13 @@ export interface PdfHandlerOptions {
     maxPages?: number | undefined;
 }
 
-/** Fallback page cap used when none is configured. */
-const DEFAULT_MAX_PAGES = 100;
-
 /**
  * Handles `application/pdf` and `application/x-pdf` responses by extracting the
  * document's text layer with Mozilla PDF.js (via `unpdf`).
  *
  * Only embedded text is extracted: scanned/image-only PDFs have no text layer
  * and yield an explanatory success message, while encrypted or malformed PDFs
- * produce an error result. A page cap (`maxPages`) bounds the extraction work.
+ * produce an error result. A page cap (`maxPages`) caps the number of pages returned.
  */
 export class PdfHandler implements ContentHandler {
     readonly name = 'pdf';
@@ -31,7 +29,11 @@ export class PdfHandler implements ContentHandler {
      *                cap; a per-call `options.maxPages` overrides it.
      */
     constructor(options: PdfHandlerOptions = {}) {
-        this.maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
+        const maxPages = options.maxPages ?? MAX_PDF_PAGES_DEFAULT;
+        if (!Number.isInteger(maxPages) || maxPages < 1) {
+            throw new Error('maxPages must be a positive integer');
+        }
+        this.maxPages = maxPages;
     }
 
     /** Matches `application/pdf` and `application/x-pdf`. */
@@ -92,6 +94,8 @@ export class PdfHandler implements ContentHandler {
             };
         } catch (error) {
             return this.errorResult(error);
+        } finally {
+            await pdf.loadingTask.destroy().catch(() => undefined);
         }
     }
 

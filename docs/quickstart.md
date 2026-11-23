@@ -10,7 +10,7 @@
 npm install @johannes.latzel/llm-chat-web
 ```
 
-## Web search
+## Web Search
 
 Search the web with DuckDuckGo, no API key required:
 
@@ -23,7 +23,7 @@ const result = await tool.execute({ queries: ['@johannes.latzel/llm-chat-web lat
 console.log(result[0].result);
 ```
 
-## URL fetching
+## URL Fetching
 
 Fetch a URL and get its clean text content:
 
@@ -36,7 +36,10 @@ const result = await tool.execute({ urls: ['https://johanneslatzel.github.io/llm
 console.log(result[0].result);
 ```
 
-## Next steps
+## Full API
+
+See the [API Reference](api-reference.md) for every export, constructor, and
+method signature.
 
 - Browse [usage](usage.md) for tool parameters, return types, and examples
 - See [architecture](architecture.md) for design details

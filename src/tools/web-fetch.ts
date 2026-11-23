@@ -9,8 +9,8 @@ import {
     Tool,
     ToolParameterProperty,
     ToolParameters
-} from '@johannes.latzel/llm-chat';
-import type { PartialToolResult } from '@johannes.latzel/llm-chat';
+} from '@johannes.latzel/llm-chat-tool';
+import type { PartialToolResult } from '@johannes.latzel/llm-chat-tool';
 import pMap from 'p-map';
 
 /** Tool that fetches one or more URLs and returns their content as clean text. */
@@ -36,8 +36,8 @@ export class WebFetchTool extends Tool {
                         'Maximum characters to return per URL (default: 10000, max: 100000)',
                         PropertyType.Number
                     ),
-                    maxPages: new ToolParameterProperty(
-                        'Maximum number of pages to extract from a document',
+                    max_pages: new ToolParameterProperty(
+                        'Maximum number of pages to return from a document',
                         PropertyType.Number
                     )
                 },
@@ -72,7 +72,7 @@ export class WebFetchTool extends Tool {
                   )
                 : this.config.maxCharsPerFetch;
 
-        const requestedMaxPages = args.maxPages;
+        const requestedMaxPages = args.max_pages;
         let maxPages: number | undefined;
         if (requestedMaxPages !== undefined) {
             if (
@@ -81,13 +81,13 @@ export class WebFetchTool extends Tool {
                 requestedMaxPages < 1
             ) {
                 return {
-                    result: "'maxPages' must be a positive integer",
+                    result: "'max_pages' must be a positive integer",
                     status: ResultStatus.Error
                 };
             }
             if (requestedMaxPages > this.config.maxPdfPages) {
                 return {
-                    result: `'maxPages' (${requestedMaxPages}) exceeds the configured maximum of ${this.config.maxPdfPages}`,
+                    result: `'max_pages' (${requestedMaxPages}) exceeds the configured maximum of ${this.config.maxPdfPages}`,
                     status: ResultStatus.Error
                 };
             }
@@ -162,6 +162,7 @@ export class WebFetchTool extends Tool {
             }
 
             const contentType = response.headers.get('content-type') || 'text/plain';
+            const charset = /charset\s*=\s*"?([^";]+)"?/i.exec(contentType)?.[1]?.trim();
 
             const handler = this.registry.getHandler(contentType);
             if (!handler) {
@@ -175,7 +176,8 @@ export class WebFetchTool extends Tool {
 
             return await handler.handle(body, trimmedUrl, response.url || trimmedUrl, {
                 maxChars,
-                maxPages
+                maxPages: maxPages ?? this.config.maxPdfPages,
+                charset
             });
         } catch (e) {
             const message = e instanceof Error ? e.message : 'Unknown fetch error';

@@ -1,5 +1,5 @@
-import { ResultStatus } from '@johannes.latzel/llm-chat';
-import type { PartialToolResult } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
+import type { PartialToolResult } from '@johannes.latzel/llm-chat-tool';
 import type { ContentHandler, HandleOptions } from '../content-handler.js';
 import { appendHint, decodeBody, truncateWithHint } from './util.js';
 
@@ -28,7 +28,10 @@ export abstract class RawTextHandler implements ContentHandler {
         _responseUrl: string,
         options: HandleOptions
     ): PartialToolResult {
-        const { text, hint } = truncateWithHint(decodeBody(body), options.maxChars);
+        const { text, hint } = truncateWithHint(
+            decodeBody(body, options.charset),
+            options.maxChars
+        );
         return {
             result: appendHint(text, hint),
             status: ResultStatus.Success

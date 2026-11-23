@@ -18,7 +18,7 @@ All variables are optional. Constructor parameters take precedence over environm
 | `LLM_CHAT_WEB_FETCH_TIMEOUT_MS` | `5000` | Timeout in ms for URL fetch requests |
 | `LLM_CHAT_WEB_SEARCH_TIMEOUT_MS` | `4000` | Timeout in ms for search API requests |
 | `LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES` | `10000000` | Max bytes accepted before rejecting the fetch (checked via HEAD) |
-| `LLM_CHAT_WEB_MAX_PDF_PAGES` | `100` | Default max pages extracted from a PDF (no hard cap; a per-call `maxPages` must not exceed it) |
+| `LLM_CHAT_WEB_MAX_PDF_PAGES` | `100` | Default maximum pages returned from a PDF; a larger per-call `max_pages` fails the call |
 
 ## WebSearchConfiguration
 
@@ -57,7 +57,7 @@ Entries are resolved in this order (first match wins):
 
 1. Constructor argument (`providers` array), when non-empty.
 2. `LLM_CHAT_WEB_SEARCH_PROVIDERS` env var: comma-separated provider names (e.g. `duckduckgo,tavily`). Unknown names are skipped. Each entry's API key comes from its dedicated per-provider env var.
-3. A single keyless `duckduckgo` entry, so zero-config setups keep working.
+3. A single keyless `duckduckgo` entry, so a default setup keeps working.
 
 The list is never empty after construction. The `strategy` property selects how the entries are combined:
 
@@ -79,7 +79,7 @@ Invalid strategy values fall back to `single`. Behavioral details are described 
 new WebFetchConfiguration()
 ```
 
-All values are read from environment variables.
+Every value except `headerRules` is read from an environment variable.
 
 ### Properties
 
@@ -89,6 +89,6 @@ All values are read from environment variables.
 | `maxCharsPerFetchLimit` | `number` | `100000` | `LLM_CHAT_WEB_MAX_CHARS_PER_FETCH_LIMIT` | Hard limit for per-request `max_chars` override |
 | `fetchTimeoutMs` | `number` | `5000` | `LLM_CHAT_WEB_FETCH_TIMEOUT_MS` | Timeout in ms for URL fetch requests |
 | `maxContentLengthBytes` | `number` | `10000000` | `LLM_CHAT_WEB_MAX_CONTENT_LENGTH_BYTES` | Max bytes accepted before rejecting the fetch |
-| `maxPdfPages` | `number` | `100` | `LLM_CHAT_WEB_MAX_PDF_PAGES` | Default max pages extracted from a PDF; a per-call `maxPages` above it fails the call |
+| `maxPdfPages` | `number` | `100` | `LLM_CHAT_WEB_MAX_PDF_PAGES` | Default maximum pages returned from a PDF; a larger per-call `max_pages` fails the call |
 | `headerRules` | `HeaderRule[]` | `[]` | — | Host-controlled header rules matched by glob pattern (config only) |
 | `concurrency` | `number` | `3` | `LLM_CHAT_WEB_FETCH_CONCURRENCY` | Concurrency limit for parallel URL fetches |

@@ -1,5 +1,5 @@
-import { ResultStatus } from '@johannes.latzel/llm-chat';
-import type { PartialToolResult } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
+import type { PartialToolResult } from '@johannes.latzel/llm-chat-tool';
 import type { ContentHandler, HandleOptions } from '../content-handler.js';
 import { extractText } from '../extract.js';
 import { appendHint, decodeBody, truncateWithHint } from './util.js';
@@ -26,7 +26,7 @@ export class HtmlHandler implements ContentHandler {
         responseUrl: string,
         options: HandleOptions
     ): PartialToolResult {
-        const extracted = extractText(decodeBody(body), url);
+        const extracted = extractText(decodeBody(body, options.charset), url);
         const title = extracted.title || url;
         const { text, hint } = truncateWithHint(
             extracted.textContent,

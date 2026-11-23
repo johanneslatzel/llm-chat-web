@@ -1,5 +1,5 @@
-import { ResultStatus } from '@johannes.latzel/llm-chat';
-import type { PartialToolResult } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
+import type { PartialToolResult } from '@johannes.latzel/llm-chat-tool';
 import type { ContentHandler, HandleOptions } from '../content-handler.js';
 import { appendHint, decodeBody, truncateWithHint } from './util.js';
 
@@ -28,7 +28,7 @@ export class JsonHandler implements ContentHandler {
         options: HandleOptions
     ): PartialToolResult {
         try {
-            const content = JSON.stringify(JSON.parse(decodeBody(body)), null, 2);
+            const content = JSON.stringify(JSON.parse(decodeBody(body, options.charset)), null, 2);
             const { text, hint } = truncateWithHint(content, options.maxChars, 'JSON');
             return {
                 result: appendHint(text, hint),

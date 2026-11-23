@@ -11,7 +11,7 @@
 
 ### Tool classes
 
-Each tool extends `Tool` from `@johannes.latzel/llm-chat`. Both accept arrays of inputs (`queries` for search, `urls` for fetch) and return chained `PartialToolResult` results via `ResultBuilder.from(results).build()`. `p-map` manages concurrency with per-tool limits.
+Each tool extends `Tool` from `@johannes.latzel/llm-chat-tool`. Both accept arrays of inputs (`queries` for search, `urls` for fetch) and return chained `PartialToolResult` results via `ResultBuilder.from(results).build()`. `p-map` manages concurrency with per-tool limits.
 
 All errors are caught and returned as plain-string messages; tools never throw.
 
@@ -25,7 +25,7 @@ The package bundles `WebSearchTool` and `WebFetchTool` into a single `ToolPackag
 
 - **Timeout**: `AbortSignal.timeout(ms)`
 - **User-Agent**: constant `llm-chat-web`
-- **Custom headers**: overridable via `SearchProvider.headers()`
+- **Custom headers**: overridable via `SearchProvider.headers`
 
 ### Search providers
 
@@ -61,7 +61,7 @@ Provider selection happens when the tool executes. `WebSearchTool` builds its ef
 - **WeightedRandom**: picks one provider per query using cumulative weight distribution; entries without a `weight` count as 1.
 - **RoundRobin**: cycles through the providers across consecutive queries; the rotation index lives on the composite instance.
 
-Zero-config setups resolve a single keyless `duckduckgo` entry, so the composite always contains at least one provider.
+A default setup with no configured providers resolves a single keyless `duckduckgo` entry, so the composite always contains at least one provider.
 
 ### WebSearchTool specifics
 
@@ -90,7 +90,7 @@ When content exceeds `max_chars`, the truncation algorithm walks down boundary t
 3. **Word break** (last space): guarantees no mid-word cuts
 4. **Hard cut**: last resort, only when no boundary is found
 
-The `[truncated]` marker is included in the character budget. Its prefix depends on the boundary used: `\n\n[truncated]` after a paragraph break, ` [truncated]` after a sentence break or hard cut, and ` ...[truncated]` after a word break.
+The `[truncated]` marker is included in the character budget. Its prefix depends on the boundary used: `\n\n[truncated]` after a paragraph break, ` [truncated]` after a sentence break or hard cut, and `... [truncated]` after a word break.
 
 When truncation happened, a character-count hint is appended after the marker, e.g. `[HTML text truncated to 100 of 500 characters]`. The label names the content type (`PDF text`, `HTML text`, `JSON`, or `text`). `truncateWithHint()` produces the truncated text plus the hint, and `appendHint()` appends it to the result.
 
@@ -100,9 +100,9 @@ Before downloading, the tool sends a `HEAD` request to check `Content-Length`. I
 
 #### Content-type handler dispatch
 
-When a response is received, `WebFetchTool` looks up the `Content-Type` header in a `FetchRegistry`: a list of `ContentHandler` instances checked in registration order. The first handler whose `match()` returns `true` processes the body via `handle()`. The body is passed as a `Uint8Array` together with a `HandleOptions` object (`{ maxChars, maxPages? }`); text handlers decode it as UTF-8, while binary handlers (such as PDF) read the bytes directly.
+When a response is received, `WebFetchTool` looks up the `Content-Type` header in a `FetchRegistry`: a list of `ContentHandler` instances checked in registration order. The first handler whose `match()` returns `true` processes the body via `handle()`. The body is passed as a `Uint8Array` together with a `HandleOptions` object (`{ maxChars, maxPages?, charset? }`); text handlers decode it as UTF-8 unless the response declares a charset, while binary handlers (such as PDF) read the bytes directly.
 
-`WebFetchTool` creates its own `FetchRegistry` if none is provided and calls `init()` in its constructor. Built-in defaults are populated only if no custom handlers were registered beforehand, so a registry with custom handlers takes priority over the built-in set (see [usage](usage.md#content-type-handling) for the handler table and examples).
+`WebFetchTool` creates its own `FetchRegistry` if none is provided and calls `init()` in its constructor. Built-in defaults are populated only when the registry has no pre-registered handlers; any handler registered before `init()` suppresses the whole built-in set (see [usage](usage.md#content-type-handling) for the handler table and examples).
 
 #### Header rules
 
@@ -110,7 +110,7 @@ When a response is received, `WebFetchTool` looks up the `Content-Type` header i
 
 ## Dependencies
 
-- `@johannes.latzel/llm-chat`: framework providing `Tool`, `ToolParameters`, `ResultStatus`, `ResultBuilder`, etc.
+- `@johannes.latzel/llm-chat-tool`: framework providing `Tool`, `ToolParameters`, `ResultStatus`, `ResultBuilder`, etc.
 - `@johannes.latzel/pattern-specific`: glob matching and most-specific-wins ordering
 - `@mozilla/readability`: article content extraction
 - `jsdom`: server-side DOM for Readability integration

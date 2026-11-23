@@ -131,14 +131,19 @@ export function appendHint(text: string, hint?: string): string {
 }
 
 /**
- * Decode a raw response body to text as UTF-8.
+ * Decode a raw response body using the given charset, falling back to UTF-8.
  *
  * Text handlers use this to turn the bytes delivered by
  * {@link ContentHandler.handle} into a string.
  *
- * @param body The raw response bytes.
+ * @param body    The raw response bytes.
+ * @param charset Optional label from the Content-Type header; defaults to `'utf-8'`.
  * @returns The decoded text.
  */
-export function decodeBody(body: Uint8Array): string {
-    return new TextDecoder().decode(body);
+export function decodeBody(body: Uint8Array, charset = 'utf-8'): string {
+    try {
+        return new TextDecoder(charset).decode(body);
+    } catch {
+        return new TextDecoder().decode(body);
+    }
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { FetchRegistry } from '../../src/lib/fetch-registry.js';
-import { truncateWithInfo } from '../../src/lib/content-handlers/util.js';
-import { ResultStatus } from '@johannes.latzel/llm-chat';
+import { decodeBody, truncateWithInfo } from '../../src/lib/content-handlers/util.js';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
 
 const enc = (value: string): Uint8Array => new TextEncoder().encode(value);
 
@@ -331,5 +331,16 @@ describe('truncateWithInfo', () => {
             keptLength: 50,
             originalLength: 500
         });
+    });
+});
+
+
+describe('decodeBody', () => {
+    it('decodes a latin-1 body when a charset is supplied', () => {
+        expect(decodeBody(Uint8Array.from([0xe9]), 'iso-8859-1')).toBe('é');
+    });
+
+    it('falls back to UTF-8 for an invalid charset label', () => {
+        expect(decodeBody(enc('ok'), 'utf8x')).toBe('ok');
     });
 });

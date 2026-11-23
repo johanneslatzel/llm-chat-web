@@ -1,6 +1,6 @@
 # Usage
 
-## Hidden parameter aliases
+## Hidden Parameter Aliases
 
 Both array parameters accept a hidden singular alias: `url` for `urls` and
 `query` for `queries`. The alias is normalized before execution and is never
@@ -14,9 +14,10 @@ Both tools can be registered together as a single `ToolPackage`:
 
 ```typescript
 import { WebToolsPackage } from '@johannes.latzel/llm-chat-web';
+import type { ToolSuiteInterface } from '@johannes.latzel/llm-chat';
 
+declare const suite: ToolSuiteInterface;
 suite.add(new WebToolsPackage());
-// Registers: web_search, web_fetch
 ```
 
 The package constructor accepts optional configuration per tool. If omitted, each config defaults to its environment-variable defaults:
@@ -68,7 +69,7 @@ Search results for "query":
     Snippet text...
 ```
 
-### Basic Search
+### Basic search
 
 ```typescript
 import { WebSearchTool, WebSearchConfiguration, WebSearchProvider } from '@johannes.latzel/llm-chat-web';
@@ -78,7 +79,7 @@ const result = await tool.execute({ queries: ['latest AI news'] });
 console.log(result[0].result);
 ```
 
-### Multiple Queries
+### Multiple queries
 
 ```typescript
 const result = await tool.execute({ queries: ['AI news', 'space news'] });
@@ -86,7 +87,7 @@ const result = await tool.execute({ queries: ['AI news', 'space news'] });
 // result[1] -> search results for "space news"
 ```
 
-### Override Parameters Per-Call
+### Override parameters per-call
 
 ```typescript
 const result = await tool.execute({
@@ -96,7 +97,7 @@ const result = await tool.execute({
 });
 ```
 
-### Switch Provider
+### Switch provider
 
 ```typescript
 import { WebSearchTool, WebSearchConfiguration, WebSearchProvider } from '@johannes.latzel/llm-chat-web';
@@ -130,7 +131,7 @@ Fetch one or more URLs in parallel and return their content as clean text. Each 
 |---|---|---|---|
 | `urls` | `string[]` | yes | Array of URLs to fetch |
 | `max_chars` | `number` | no | Override max characters returned per URL (clamped to `[1, maxCharsPerFetchLimit]`) |
-| `maxPages` | `number` | no | Max pages to extract from a paginated document (currently only PDF); must be a positive integer and no greater than `maxPdfPages`, otherwise the call fails |
+| `max_pages` | `number` | no | Maximum pages returned from a PDF; must be a positive integer and no greater than `maxPdfPages`, otherwise the call fails |
 
 ### Returns
 
@@ -183,10 +184,10 @@ The tool dispatches the response content type to a registered handler from the `
 | Other `text/*` | Returned as-is |
 | Other types | Rejected with "Unsupported content type" |
 
-See [architecture](architecture.md#content-type-handler-dispatch) for the dispatch mechanism. To supply custom handlers that take priority over the built-in defaults:
+See [architecture](architecture.md#content-type-handler-dispatch) for the dispatch mechanism. To replace the built-in handlers entirely (any handler registered before `init()` suppresses the defaults):
 
 ```typescript
-import { ResultStatus } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
 import {
     WebFetchTool,
     WebFetchConfiguration,

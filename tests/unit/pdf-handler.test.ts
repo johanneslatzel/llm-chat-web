@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ResultStatus } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
 
 vi.mock('unpdf', () => ({
     getDocumentProxy: vi.fn(),
@@ -10,7 +10,7 @@ import { extractText, getDocumentProxy } from 'unpdf';
 import { PdfHandler } from '../../src/lib/content-handlers/pdf-handler.js';
 
 function fakeProxy() {
-    return {};
+    return { loadingTask: { destroy: async () => undefined } };
 }
 
 const bytes = new TextEncoder().encode('%PDF-1.4 fake');
@@ -151,3 +151,26 @@ describe('PdfHandler', () => {
         expect(result.result).toBe('Failed to extract text from PDF: weird failure');
     });
 });
+
+
+    it('rejects a non-positive page cap', () => {
+        expect(() => new PdfHandler({ maxPages: 0 })).toThrow('positive integer');
+        expect(() => new PdfHandler({ maxPages: 1.5 })).toThrow('positive integer');
+    });
+
+
+    it('ignores a destroy failure after a successful extraction', async () => {
+        const proxy = {
+            loadingTask: {
+                destroy: async () => {
+                    throw new Error('destroy failed');
+                }
+            }
+        };
+        vi.mocked(getDocumentProxy).mockResolvedValue(proxy as never);
+        vi.mocked(extractText).mockResolvedValue({ totalPages: 1, text: ['Hello'] } as never);
+        const handler = new PdfHandler();
+        const result = await handler.handle(bytes, 'u', 'u', { maxChars: 100 });
+        expect(result.status).toBe(ResultStatus.Success);
+        expect(result.result).toBe('Hello');
+    });

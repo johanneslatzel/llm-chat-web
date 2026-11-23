@@ -6,7 +6,7 @@ import {
     ProviderStrategy
 } from '../../src/index.js';
 import type { ProviderEntry } from '../../src/index.js';
-import { ResultStatus } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
 import { mockFetch, mockFetchSequence, restoreFetch } from '../index.js';
 
 const { mockPMap } = vi.hoisted(() => ({ mockPMap: vi.fn() }));
@@ -66,7 +66,7 @@ describe('WebSearchTool', () => {
 
     it('does not expose query in the schema', () => {
         const tool = new WebSearchTool(cfg);
-        const parameters = tool.toOpenAI().function.parameters as {
+        const parameters = tool.definition().parameters as {
             properties: Record<string, unknown>;
         };
         expect(parameters.properties.query).toBeUndefined();

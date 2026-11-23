@@ -1,4 +1,4 @@
-import type { PartialToolResult } from '@johannes.latzel/llm-chat';
+import type { PartialToolResult } from '@johannes.latzel/llm-chat-tool';
 
 /**
  * Per-call options passed to {@link ContentHandler.handle}.
@@ -6,10 +6,12 @@ import type { PartialToolResult } from '@johannes.latzel/llm-chat';
  * @property maxChars Maximum characters allowed in the returned content.
  * @property maxPages Optional page cap for paginated formats (e.g. PDF).
  *                    Handlers for non-paginated formats ignore it.
+ * @property charset Optional character set from the Content-Type header. Defaults to UTF-8.
  */
 export interface HandleOptions {
     maxChars: number;
     maxPages?: number | undefined;
+    charset?: string | undefined;
 }
 
 /**

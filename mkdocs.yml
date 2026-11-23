@@ -18,6 +18,7 @@ nav:
     - Environment Variables: configuration.md
     - Quick Start: quickstart.md
     - Usage: usage.md
+    - API Reference: api-reference.md
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true

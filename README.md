@@ -37,10 +37,10 @@ npm install @johannes.latzel/llm-chat-web
 
 Full documentation at **[johanneslatzel.github.io/llm-chat-web/](https://johanneslatzel.github.io/llm-chat-web/)**
 
-## License
-
-MIT. See [`LICENSE`](LICENSE).
-
 ## Contributing
 
 Issues and PRs welcome at [github.com/johanneslatzel/llm-chat-web](https://github.com/johanneslatzel/llm-chat-web).
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).

@@ -10,9 +10,12 @@ import {
     Tool,
     ToolParameterProperty,
     ToolParameters
-} from '@johannes.latzel/llm-chat';
-import type { PartialToolResult } from '@johannes.latzel/llm-chat';
+} from '@johannes.latzel/llm-chat-tool';
+import type { PartialToolResult } from '@johannes.latzel/llm-chat-tool';
 import pMap from 'p-map';
+
+const MAX_RESULTS_LIMIT = 20;
+const MAX_CHARS_PER_RESULT_LIMIT = 50_000;
 
 /**
  * Format search results into a human-readable string.
@@ -81,12 +84,15 @@ export class WebSearchTool extends Tool {
 
         const maxResults =
             typeof args.max_results === 'number'
-                ? Math.min(Math.max(1, Math.floor(args.max_results)), 20)
+                ? Math.min(Math.max(1, Math.floor(args.max_results)), MAX_RESULTS_LIMIT)
                 : this.config.maxResults;
 
         const maxCharsPerResult =
             typeof args.max_chars_per_result === 'number'
-                ? Math.min(Math.max(1, Math.floor(args.max_chars_per_result)), 50000)
+                ? Math.min(
+                      Math.max(1, Math.floor(args.max_chars_per_result)),
+                      MAX_CHARS_PER_RESULT_LIMIT
+                  )
                 : this.config.maxCharsPerResult;
 
         let provider: SearchProvider;

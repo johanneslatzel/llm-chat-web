@@ -6,7 +6,7 @@ import { envInt, envString, envEnum } from './env.js';
 const MAX_CHARS_PER_FETCH_DEFAULT = 10_000;
 const MAX_CHARS_PER_FETCH_LIMIT = 100_000;
 const MAX_CONTENT_LENGTH_BYTES_DEFAULT = 10_000_000;
-const MAX_PDF_PAGES_DEFAULT = 100;
+export const MAX_PDF_PAGES_DEFAULT = 100;
 /** Default timeout (ms) for individual HTTP fetch requests. */
 export const FETCH_TIMEOUT_DEFAULT_MS = 5_000;
 /** Default timeout (ms) for search provider API calls. */

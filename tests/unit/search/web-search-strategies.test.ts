@@ -5,7 +5,7 @@ import {
     WebSearchTool,
     ProviderStrategy
 } from '../../../src/index.js';
-import { ResultStatus } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
 import { mockFetch, mockFetchSequence, restoreFetch } from '../../index.js';
 
 const { mockPMap } = vi.hoisted(() => ({ mockPMap: vi.fn() }));
@@ -133,7 +133,6 @@ describe('WebSearchTool multi-provider strategies', () => {
         expect(captured.urls[0]).toContain('api.tavily.com');
         expect(captured.urls[1]).toContain('api.exa.ai');
     });
-});
 
     it('caps concurrency at 1 when every provider entry is duckduckgo', async () => {
         const cfg = new WebSearchConfiguration([{ provider: WebSearchProvider.DuckDuckGo }]);
@@ -167,4 +166,5 @@ describe('WebSearchTool multi-provider strategies', () => {
         const options = calls[calls.length - 1]![2] as { concurrency: number };
         expect(options.concurrency).toBe(Math.max(1, cfg.concurrency));
     });
+});
 

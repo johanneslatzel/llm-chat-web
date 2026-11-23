@@ -1,4 +1,4 @@
-import { ToolPackage } from '@johannes.latzel/llm-chat';
+import { ToolPackage } from '@johannes.latzel/llm-chat-tool';
 import { WebSearchConfiguration, WebFetchConfiguration } from '../lib/config.js';
 import { WebSearchTool } from './web-search.js';
 import { WebFetchTool } from './web-fetch.js';

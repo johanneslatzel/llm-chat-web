@@ -3,7 +3,7 @@ import {
     WebFetchConfiguration,
     WebFetchTool
 } from '../../src/index.js';
-import { ResultStatus } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
 import { mockFetch, mockFetchError, mockFetchSequence, restoreFetch } from '../index.js';
 import type { MockFetchResponse } from '../index.js';
 import { fetchWithTimeout } from '../../src/lib/http.js';
@@ -67,7 +67,7 @@ describe('WebFetchTool', () => {
 
     it('does not expose url in the schema', () => {
         const tool = new WebFetchTool(cfg);
-        const parameters = tool.toOpenAI().function.parameters as {
+        const parameters = tool.definition().parameters as {
             properties: Record<string, unknown>;
         };
         expect(parameters.properties.url).toBeUndefined();
@@ -189,36 +189,36 @@ describe('WebFetchTool', () => {
         expect(result[0]!.status).toBe(ResultStatus.Success);
     });
 
-    it('rejects maxPages above the configured maximum', async () => {
+    it('rejects max_pages above the configured maximum', async () => {
         const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 999 });
+        const result = await tool.execute({ urls: ['https://example.com'], max_pages: 999 });
         expect(result[0]!.status).toBe(ResultStatus.Error);
-        expect(result[0]!.result).toContain('maxPages');
+        expect(result[0]!.result).toContain('max_pages');
         expect(result[0]!.result).toContain('exceeds the configured maximum');
     });
 
-    it('rejects a non-integer maxPages', async () => {
+    it('rejects a non-integer max_pages', async () => {
         const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 1.5 });
+        const result = await tool.execute({ urls: ['https://example.com'], max_pages: 1.5 });
         expect(result[0]!.status).toBe(ResultStatus.Error);
         expect(result[0]!.result).toContain('positive integer');
     });
 
-    it('rejects a non-number maxPages', async () => {
+    it('rejects a non-number max_pages', async () => {
         const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 'x' });
+        const result = await tool.execute({ urls: ['https://example.com'], max_pages: 'x' });
         expect(result[0]!.status).toBe(ResultStatus.Error);
         expect(result[0]!.result).toContain('positive integer');
     });
 
-    it('rejects maxPages below 1', async () => {
+    it('rejects max_pages below 1', async () => {
         const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 0 });
+        const result = await tool.execute({ urls: ['https://example.com'], max_pages: 0 });
         expect(result[0]!.status).toBe(ResultStatus.Error);
         expect(result[0]!.result).toContain('positive integer');
     });
 
-    it('accepts a maxPages within the configured maximum', async () => {
+    it('accepts a max_pages within the configured maximum', async () => {
         mockFetch({
             ok: true,
             status: 200,
@@ -227,7 +227,7 @@ describe('WebFetchTool', () => {
             headers: { 'content-type': 'text/plain' }
         });
         const tool = new WebFetchTool(cfg);
-        const result = await tool.execute({ urls: ['https://example.com'], maxPages: 5 });
+        const result = await tool.execute({ urls: ['https://example.com'], max_pages: 5 });
         expect(result[0]!.status).toBe(ResultStatus.Success);
     });
 
@@ -479,5 +479,46 @@ describe('WebFetchTool', () => {
         expect(result).toHaveLength(1);
         expect(result[0]!.status).toBe(ResultStatus.Error);
         expect(result[0]!.result).toContain('Web fetch error');
+    });
+});
+
+
+describe('charset handling', () => {
+    beforeEach(() => {
+        mockPMap.mockImplementation(
+            async <T>(items: readonly (() => T)[], _mapper: (item: () => T) => T, _options: unknown): Promise<T[]> => {
+                const results: T[] = [];
+                for (const item of items) {
+                    results.push(await _mapper(item));
+                }
+                return results;
+            }
+        );
+    });
+
+    it('accepts a quoted charset parameter', async () => {
+        mockFetch({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            body: 'hello',
+            headers: { 'content-type': 'text/plain; charset="utf-8"' }
+        });
+        const tool = new WebFetchTool(new WebFetchConfiguration());
+        const result = await tool.execute({ urls: ['https://example.com'] });
+        expect(result[0]!.status, String(result[0]!.result)).toBe(ResultStatus.Success);
+    });
+
+    it('falls back to UTF-8 for an unknown charset', async () => {
+        mockFetch({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            body: 'hello',
+            headers: { 'content-type': 'text/plain; charset=utf8x' }
+        });
+        const tool = new WebFetchTool(new WebFetchConfiguration());
+        const result = await tool.execute({ urls: ['https://example.com'] });
+        expect(result[0]!.status, String(result[0]!.result)).toBe(ResultStatus.Success);
     });
 });
